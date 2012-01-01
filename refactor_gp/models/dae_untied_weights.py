@@ -131,7 +131,8 @@ class DAE_untied_weights(DAE):
         elif self.act_func[0] == 'sigmoid':
             h = T.nnet.sigmoid(h_act)
         elif self.act_func[0] == 'id':
-            # bad idae
+            h = T.nnet.sigmoid(h_act)
+            # bad idea
             h = h_act
         else:
             raise("Invalid act_func[0]")
@@ -146,12 +147,20 @@ class DAE_untied_weights(DAE):
         else:
             raise("Invalid act_func[1]")
 
+        importance_sampling_weights = T.dvector('importance_sampling_weights')
 
         # Another variable to be able to call a function
         # with a noisy x and compare it to a reference x.
         y = T.dmatrix('y')
 
-        loss = ((r - y)**2)
+        # Make importance_sampling_weights have a broadcastable dimension
+        # to multiply all the reconstructed components.
+        # This is useful if we are minimizing the loss function
+        # using a distribution that is slightly more noisy and
+        # we need to have some correction factor to the loss
+        # to make it equivalent.
+
+        loss = ((r - y)**2) * importance_sampling_weights[:,np.newaxis]
         sum_loss = T.sum(loss)
         
         # theano_encode_decode : vectorial function in argument X.
@@ -161,9 +170,9 @@ class DAE_untied_weights(DAE):
         #                    so it's not a "vectorial" function.
 
         self.theano_encode_decode = function([Wb,Wc,b,c,s,x], r)
-        self.theano_loss = function([Wb,Wc,b,c,s,x,y], loss)
+        self.theano_loss = function([Wb,Wc,b,c,s,x,y,importance_sampling_weights], loss)
 
-        self.theano_gradients = function([Wb,Wc,b,c,s,x,y],
+        self.theano_gradients = function([Wb,Wc,b,c,s,x,y,importance_sampling_weights],
                                          [T.grad(sum_loss, Wb), T.grad(sum_loss, Wc),
                                           T.grad(sum_loss, b),  T.grad(sum_loss, c),
                                           T.grad(sum_loss, s)])
@@ -189,14 +198,19 @@ class DAE_untied_weights(DAE):
 
         return self.theano_encode_decode(self.Wb, self.Wc, self.b, self.c, self.s, X)
 
-    def model_loss(self, X, noisy_X):
+    def model_loss(self, X, noisy_X, importance_sampling_weights = None):
         """
-        X:       array-like, shape (n_examples, n_inputs)
-        noisy_X: array-like, shape (n_examples, n_inputs)
+        X:       array, shape (n_examples, n_inputs)
+        noisy_X: array, shape (n_examples, n_inputs)
+        importance_sampling_weights : optional, array, shape (n_examples,)
 
         Returns  loss: array-like, shape (n_examples,)
         """
-        return self.theano_loss(self.Wb, self.Wc, self.b, self.c, self.s, noisy_X, X)
+
+        if importance_sampling_weights is None:
+            importance_sampling_weights = np.ones((X.shape[0],))
+
+        return self.theano_loss(self.Wb, self.Wc, self.b, self.c, self.s, noisy_X, X, importance_sampling_weights)
 
 
 
@@ -281,9 +295,13 @@ class DAE_untied_weights(DAE):
     def q_set_params(self, q):
         (self.Wb, self.Wc, self.b, self.c, self.s) = DAE_untied_weights.read_params_from_q(q, self.n_inputs, self.n_hiddens)
 
-    def q_grad(self, q, X, noisy_X):
+    def q_grad(self, q, X, noisy_X, importance_sampling_weights = None):
         (Wb, Wc, b, c, s) = DAE_untied_weights.read_params_from_q(q, self.n_inputs, self.n_hiddens)
-        (grad_Wb, grad_Wc, grad_b, grad_c, grad_s) = self.theano_gradients(Wb, Wc, b, c, s, noisy_X, X)
+
+        if importance_sampling_weights is None:
+            importance_sampling_weights = np.ones((X.shape[0],))
+
+        (grad_Wb, grad_Wc, grad_b, grad_c, grad_s) = self.theano_gradients(Wb, Wc, b, c, s, noisy_X, X, importance_sampling_weights)
 
         # There might be a simpler way with theano to do this,
         # but this seems like a good approach.
@@ -292,9 +310,13 @@ class DAE_untied_weights(DAE):
 
         return DAE_untied_weights.serialize_params_as_q(grad_Wb, grad_Wc, grad_b, grad_c, grad_s)
 
-    def q_loss(self, q, X, noisy_X):
+    def q_loss(self, q, X, noisy_X, importance_sampling_weights):
         (Wb, Wc, b, c, s) = DAE_untied_weights.read_params_from_q(q, self.n_inputs, self.n_hiddens)
-        return self.theano_loss(Wb, Wc, b, c, s, noisy_X, X)
+
+        if importance_sampling_weights is None:
+            importance_sampling_weights = np.ones((X.shape[0],))
+
+        return self.theano_loss(Wb, Wc, b, c, s, noisy_X, X, importance_sampling_weights)
 
 
 

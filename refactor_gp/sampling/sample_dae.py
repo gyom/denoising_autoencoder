@@ -183,34 +183,21 @@ def main(argv):
         #                  'f_parameters':f_parameters,
         #                  'computational_cost_in_seconds':computational_cost_in_seconds}
 
-        if True:
-            mixturemvn = gaussian_mixture_tools.MixtureMVN(extra_props['component_means'], extra_props['component_covariances'])
+        mixturemvn = gaussian_mixture_tools.MixtureMVN(extra_props['component_means'], extra_props['component_covariances'])
             
-            def grad_E(x):
-                res = - mixturemvn.grad_pdf(x)
-                #base_truth_res = gaussian_mixture_tools.grad_E(x, extra_props['component_means'], extra_props['component_covariances'])
-                #assert(np.all(np.abs(res - base_truth_res) < 1e-8))
+        def grad_E(x):
+            res = - mixturemvn.grad_pdf(x)
+            #base_truth_res = gaussian_mixture_tools.grad_E(x, extra_props['component_means'], extra_props['component_covariances'])
+            #assert(np.all(np.abs(res - base_truth_res) < 1e-8))
 
-                if np.any(np.isnan(res)):
-                    print "grad_E got argument"
-                    print x
-                    print "and returned"
-                    print res
-                    print "ERROR. grad_E just returned nan !"
-                    quit()
-                return res
-        else:
-            # This method has now been completely commented out. Let's keep it around only for a short time.
-            def grad_E(x):
-                res = gaussian_mixture_tools.grad_E(x, extra_props['component_means'], extra_props['component_covariances'])
-                if np.any(np.isnan(res)):
-                    print "grad_E got argument"
-                    print x
-                    print "and returned"
-                    print res
-                    print "ERROR. grad_E just returned nan !"
-                    quit()
-                return res
+            if np.any(np.isnan(res)):
+                print "grad_E got argument"
+                print x
+                print "and returned"
+                print res
+                print "ERROR. grad_E just returned nan !"
+                quit()
+            return res
 
         def r(x):
             return x + fake_train_stddev**2 * grad_E(x)

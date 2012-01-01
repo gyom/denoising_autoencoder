@@ -23,7 +23,7 @@ def main(argv):
     import json
 
     try:
-        opts, args = getopt.getopt(argv[1:], "hv", ["n_hiddens=", "maxiter=", "lbfgs_rank=", "act_func=", "noise_stddevs=", "alt_valid_noise_stddevs=", "train_samples_pickle=", "valid_samples_pickle=", "test_samples_pickle=", "output_dir=", "want_early_termination=", "save_hidden_units=", "resume_dae_pickle="])
+        opts, args = getopt.getopt(argv[1:], "hv", ["n_hiddens=", "maxiter=", "lbfgs_rank=", "act_func=", "noise_stddevs=", "train_samples_pickle=", "valid_samples_pickle=", "test_samples_pickle=", "output_dir=", "save_hidden_units=", "resume_dae_pickle="])
     except getopt.GetoptError as err:
         # print help information and exit:
         print str(err) # will print something like "option -a not recognized"
@@ -40,7 +40,6 @@ def main(argv):
     valid_samples_pickle = None
     test_samples_pickle = None
     output_dir = None
-    want_early_termination = False
     # used for multilayers
     save_hidden_units = False
     resume_dae_pickle = None
@@ -64,14 +63,11 @@ def main(argv):
             assert len(act_func) == 2
         elif o in ("--noise_stddevs"):
             noise_stddevs = json.loads(a)
-            assert type(noise_stddevs) in [list, float, int]
-            if type(noise_stddevs) in [float, int]:
-                noise_stddevs = [noise_stddevs]
-        elif o in ("--alt_valid_noise_stddevs"):
-            alt_valid_noise_stddevs = json.loads(a)
-            assert type(alt_valid_noise_stddevs) in [list, float, int]
-            if type(alt_valid_noise_stddevs) in [float, int]:
-                alt_valid_noise_stddevs = [alt_valid_noise_stddevs]
+            #assert type(noise_stddevs) in [list, float, int]
+            #if type(noise_stddevs) in [float, int]:
+            #    noise_stddevs = [noise_stddevs]
+            assert type(noise_stddevs) in [dict]
+            assert noise_stddevs.has_key('train')
         elif o in ("--train_samples_pickle"):
             train_samples_pickle = a
         elif o in ("--valid_samples_pickle"):
@@ -80,16 +76,12 @@ def main(argv):
             test_samples_pickle = a
         elif o in ("--output_dir"):
             output_dir = a
-        elif o in ("--want_early_termination"):
-            want_early_termination = ((a == "True") or (a == "true") or (a=="1"))
         elif o in ("--save_hidden_units"):
             save_hidden_units = ((a == "True") or (a == "true") or (a=="1"))
         elif o in ("--resume_dae_pickle"):
             resume_dae_pickle = a
         else:
             assert False, "unhandled option"
- 
-    #print "want_early_termination is %d" % want_early_termination
 
     assert os.path.exists(train_samples_pickle)
     train_samples = cPickle.load(open(train_samples_pickle, 'rb'))
@@ -127,43 +119,24 @@ def main(argv):
 
     start_time = time.time()
 
-    if want_early_termination:
-        early_termination_args = {'stop_if_loss_greater_than':"auto"}
-    else:
-        early_termination_args = {}
+    #(train_model_losses, valid_model_losses, post_valid_model_losses, post_alt_valid_model_losses) = \
+    #    mydae.fit_with_decreasing_noise(train_samples,
+    #                                    noise_stddevs,
+    #                                    {'method' : 'fmin_l_bfgs_b',
+    #                                     'maxiter' : maxiter,
+    #                                     'm':lbfgs_rank},
+    #                                    X_valid = valid_samples}
 
-    (train_model_losses, valid_model_losses, post_valid_model_losses, post_alt_valid_model_losses) = \
-        mydae.fit_with_decreasing_noise(train_samples,
-                                        noise_stddevs,
-                                        {'method' : 'fmin_l_bfgs_b',
-                                         'maxiter' : maxiter,
-                                         'm':lbfgs_rank},
-                                        early_termination_args,
-                                        X_valid = valid_samples,
-                                        list_of_additional_valid_stddev = alt_valid_noise_stddevs)
-    #print "post_valid_model_losses"
-    #print post_valid_model_losses
-    #print
+    best_q_mean_losses = mydae.fit_with_stddevs_sequence(train_samples, valid_samples, noise_stddevs,
+                                                         {'method' : 'fmin_l_bfgs_b',
+                                                          'maxiter' : maxiter,
+                                                          'm':lbfgs_rank})
 
-    # We'll simplify some of the later steps by simply
-    # referring to "model_losses" for the version that
-    # was used. This will be used later when loading
-    # the model in sample_dae.py, but it's not actually
-    # necessary since we could also reason things out
-    # from the np.nan present.
-    if not (valid_samples == None):
-        model_losses = valid_model_losses
-    else:
-        model_losses = train_model_losses
-
+    #train_model_losses = best_q_mean_losses['train']
+    
     end_time = time.time()
     computational_cost_in_seconds = int(end_time - start_time)
     print "Training took %d seconds." % (computational_cost_in_seconds,)
-
-    early_termination_occurred = False
-    if np.nan in model_losses:
-        early_termination_occurred = True
-        print "We terminated early in the training because we couldn't do better than the identity function r(x) = x."
 
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -192,13 +165,14 @@ def main(argv):
                      'train_samples_pickle':train_samples_pickle,
                      'valid_samples_pickle':valid_samples_pickle,
                      'test_samples_pickle':test_samples_pickle,
-                     'model_losses':model_losses,
-                     'train_model_losses':train_model_losses,
-                     'valid_model_losses':valid_model_losses,
-                     'post_valid_model_losses':post_valid_model_losses,
-                     'post_alt_valid_model_losses':post_alt_valid_model_losses,
-                     'computational_cost_in_seconds':computational_cost_in_seconds,
-                     'early_termination_occurred':early_termination_occurred}
+                     'train_model_losses' : best_q_mean_losses['train'],
+                     'model_losses' : best_q_mean_losses,
+                     #'model_losses':model_losses,
+                     #'train_model_losses':train_model_losses,
+                     #'valid_model_losses':valid_model_losses,
+                     #'post_valid_model_losses':post_valid_model_losses,
+                     #'post_alt_valid_model_losses':post_alt_valid_model_losses,
+                     'computational_cost_in_seconds':computational_cost_in_seconds}
 
     if save_hidden_units:
         for (samples, prefix) in [(train_samples, 'train'),

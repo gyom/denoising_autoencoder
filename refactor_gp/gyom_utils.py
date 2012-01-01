@@ -133,6 +133,53 @@ def grad_mvnpdf(x,m,covariance=None,precision=None,precision_det=None, want_log_
 
 ####################################
 
+def isotropic_gaussian_noise_and_importance_sampling_weights(X, sampled_stddev, target_stddev = None):
+    """
+    Generates a noisy_X array with the same shape as X but
+    with added isotropic gaussian noise.
 
+    The noise has stddev equal to sampled_stddev.
+    If the target_stddev argument is not None, then we
+    also compute importance_sampling_weights telling us
+    what correction factor we should use if we use this
+    to estimate an expectation with respect to
+    an alternative distribution where the stddev would be
+    target_stddev.
 
+    Practically, what this means is that you want samples
+    with stddev 1.0 so you let target_stddev = 1.0.
+    However, because you want to reduce the variance, you
+    pick something like sampled_stddev = 5.0 which means
+    that you cover a lot more values.
+
+    You have to be careful because most of the importance_sampling_weights
+    will be ridiculously small if you use a big difference
+    between the stddevs and you'll wind up with an effective
+    sample size way smaller (because they almost all have ~ 0.0 weight).
+
+    Assumes that
+        X.shape is (nbr_of_points, dimension_of_points)
+
+    Returns (noisy_X, importance_sampling_weights)
+    where
+        noisy_X.shape == X.shape
+        importance_sampling_weights.shape == (X.shape[0], )
+    """
+
+    assert sampled_stddev >= 0.0
+    if sampled_stddev == 0.0:
+        # bail out and return the same X
+        importance_sampling_weights = np.ones((X.shape[0],))
+        return (X, importance_sampling_weights)
+
+    delta_X = np.random.normal(size = X.shape, scale = sampled_stddev)
+    noisy_X = X + delta_X
+
+    if target_stddev is None:
+        importance_sampling_weights = np.ones((X.shape[0],))
+        return (noisy_X, importance_sampling_weights)
+    else:
+        assert target_stddev > 0
+        importance_sampling_weights = sampled_stddev / target_stddev * np.exp(-0.5*delta_X.sum(axis=1)*(1/target_stddev**2 - 1/sampled_stddev**2))
+        return (noisy_X, importance_sampling_weights)
 
