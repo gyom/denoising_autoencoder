@@ -154,7 +154,7 @@ class DAE(object):
             return self.theano_loss(self.W, self.b, self.c, x, x)
 
     def reset_params(self):
-        self.W = numpy.random.uniform( low = -0.1, high = 0.1, size=(self.n_inputs, self.n_hiddens) )
+        self.W = numpy.random.uniform( low = -4.1, high = 4.1, size=(self.n_inputs, self.n_hiddens) )
         #self.W = numpy.random.uniform(
         #    low = - 4.0 * numpy.sqrt(6./(self.n_inputs + self.n_hiddens)),
         #    high = 4.0 * numpy.sqrt(6./(self.n_inputs + self.n_hiddens)),
