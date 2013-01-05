@@ -154,13 +154,15 @@ class DAE(object):
             return self.theano_loss(self.W, self.b, self.c, x, x)
 
     def reset_params(self):
-        self.W = numpy.random.uniform( low = -4.1, high = 4.1, size=(self.n_inputs, self.n_hiddens) )
+        self.W = numpy.random.uniform( low = -1.0, high = 1.0, size=(self.n_inputs, self.n_hiddens) )
         #self.W = numpy.random.uniform(
         #    low = - 4.0 * numpy.sqrt(6./(self.n_inputs + self.n_hiddens)),
         #    high = 4.0 * numpy.sqrt(6./(self.n_inputs + self.n_hiddens)),
         #    size=(d, self.n_hiddens))
-        self.c = numpy.zeros(self.n_hiddens)
-        self.b = numpy.zeros(self.n_inputs)
+        self.b = numpy.random.uniform( low = -0.1, high = 0.1, size=(self.n_inputs,) )
+        self.c = numpy.random.uniform( low = -0.1, high = 0.1, size=(self.n_hiddens,) )
+        #self.b = numpy.zeros(self.n_inputs)
+        #self.c = numpy.zeros(self.n_hiddens)
 
     def set_params_to_best_noisy(self):
         self.W = self.best_noisy_params['W']
@@ -207,6 +209,7 @@ class DAE(object):
                 self.best_noisy_params['W'] = self.W
                 self.best_noisy_params['b'] = self.b
                 self.best_noisy_params['c'] = self.c
+                print "Updated the best noisy loss as %0.6f" % self.logging['noisy']['mean_abs_loss'][-1]
 
         # 'noiseless'
         noiseless_all_losses, noiseless_all_abs_act, noiseless_all_abs_ract = self.model_loss(X, noise_stddev = 0.0)
@@ -232,6 +235,7 @@ class DAE(object):
                 self.best_noiseless_params['W'] = self.W
                 self.best_noiseless_params['b'] = self.b
                 self.best_noiseless_params['c'] = self.c
+                print "Updated the best noiseless loss as %0.6f" % self.logging['noiseless']['mean_abs_loss'][-1]
 
 
         if verbose:

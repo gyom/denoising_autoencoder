@@ -3,7 +3,7 @@
 import dae
 #dae = reload(dae)
 mydae = dae.DAE(n_inputs=2,
-                n_hiddens=80)
+                n_hiddens=1000)
 
 ## ----------------------
 ## Get the training data.
@@ -12,9 +12,9 @@ mydae = dae.DAE(n_inputs=2,
 import debian_spiral
 import numpy as np
 
-n_spiral_samples = 5000
-spiral_samples_noise_stddev = 0.0001
-angle_restriction = 0.4
+n_spiral_samples = 2500
+spiral_samples_noise_stddev = 0.001
+angle_restriction = 1.0
 data = debian_spiral.sample(n_spiral_samples, spiral_samples_noise_stddev,
                             want_sorted_data = False, angle_restriction = angle_restriction)
 
@@ -24,10 +24,13 @@ data = debian_spiral.sample(n_spiral_samples, spiral_samples_noise_stddev,
 ## -----------------------------------
 
 batch_size = 50
-n_epochs = 4000
+n_epochs = 10000
 train_noise_stddev = 0.01
 
-if True:
+method = 'hmc'
+#method = 'gradient_descent_multi_stage'
+
+if method == 'gradient_descent':
     import dae_train_gradient_descent
     learning_rate = 1.0e-3
     dae_train_gradient_descent.fit(mydae,
@@ -35,15 +38,26 @@ if True:
                                    batch_size, n_epochs,
                                    train_noise_stddev, learning_rate,
                                    verbose=True)
-else:
+elif method == 'gradient_descent_multi_stage':
+    import dae_train_gradient_descent
+    for learning_rate in [1.0e-3, 1.0e-4, 1.0e-6]:
+        dae_train_gradient_descent.fit(mydae,
+                                       data,
+                                       batch_size, n_epochs,
+                                       train_noise_stddev, learning_rate,
+                                       verbose=True)
+elif method == 'hmc':
     import dae_train_hmc
-    L = 10
-    epsilon = 0.1
+    L = 100
+    epsilon = 0.01
     dae_train_hmc.fit(mydae,
                       data,
                       batch_size, n_epochs,
                       train_noise_stddev, L, epsilon,
                       verbose=True)
+else:
+    error("Unrecognized training method.")
+
 
 mydae.set_params_to_best_noisy()
 # mydae.set_params_to_best_noiseless()
@@ -86,7 +100,13 @@ def plot_training_loss_history(mydae, outputfile, last_index = -1):
             pylab.close()
 
 # We want to pick some interesting index at which most of the learning has already taken place.
-interesting_index = numpy.where( mydae.logging['noiseless']['mean_abs_loss'] < 0.1 * mydae.logging['noiseless']['mean_abs_loss'][-1] )[0][0]
+A = mydae.logging['noiseless']['mean_abs_loss'] < 4.0 * mydae.logging['noiseless']['mean_abs_loss'][-1]
+if np.any(A):
+    interesting_index = np.where( A )[0][0]
+else:
+    interesting_index = int(n_epochs / 10)
+del A
+print "interesting_index = %d" % interesting_index
 
 plot_training_loss_history(mydae, os.path.join(output_directory, 'absolute_losses_start_to_interesting_index.png'), interesting_index)
 plot_training_loss_history(mydae, os.path.join(output_directory, 'absolute_losses_start_to_end.png'), -1)
@@ -163,6 +183,16 @@ plot_grid_reconstruction_grid(mydae, os.path.join(output_directory, 'spiral_reco
 html_file_path = os.path.join(output_directory, 'results.html')
 f = open(html_file_path, "w")
 
+if method == 'hmc':
+    hyperparams_contents_for_method = """
+    <p>frogleap jumps  : %d</p>
+    <p>epsilon : %f</p>
+    """ % (L, epsilon)
+elif method == 'gradient_descent' or method == 'gradient_descent_multi_stage':
+    hyperparams_contents_for_method = """
+    <p>learning rate  : %f</p>
+    """ % (learning_rate,)
+
 hyperparams_contents = """
 <p>nbr visible units : %d</p>
 <p>nbr hidden  units : %d</p>
@@ -170,7 +200,8 @@ hyperparams_contents = """
 <p>batch size : %d</p>
 <p>epochs : %d</p>
 
-<p>learning rate  : %0.6f</p>
+%s
+
 <p>training noise : %0.6f</p>
 
 <p>dataset points : %d</p>
@@ -180,7 +211,7 @@ hyperparams_contents = """
        mydae.n_hiddens,
        batch_size,
        n_epochs,
-       learning_rate,
+       hyperparams_contents_for_method,
        train_noise_stddev,
        n_spiral_samples,
        spiral_samples_noise_stddev,

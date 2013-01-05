@@ -1,6 +1,8 @@
 
 import numpy as np
 import hamiltonian_monte_carlo as hmc
+# for flushing output
+import sys
 
 def perform_one_update(the_dae, X, noise_stddev, L, epsilon, simulate_only  = False):
 
@@ -39,7 +41,7 @@ def perform_one_update(the_dae, X, noise_stddev, L, epsilon, simulate_only  = Fa
         # the dataset X is baked into the definition of U(q)
         (W, b, c) = read_params_from_q(q, the_dae.n_inputs, the_dae.n_hiddens)
         (loss, _, _) = the_dae.theano_loss(W, b, c, perturbed_X, X)
-        return loss
+        return loss.sum()
 
     def grad_U(q):
         (W, b, c) = read_params_from_q(q, the_dae.n_inputs, the_dae.n_hiddens)
@@ -53,7 +55,18 @@ def perform_one_update(the_dae, X, noise_stddev, L, epsilon, simulate_only  = Fa
 
 
     current_q = serialize_params_as_q(the_dae.W, the_dae.b, the_dae.c)
-    updated_q = hmc.one_step_update(U, grad_U, epsilon, L, current_q, verbose=False)
+    updated_q = hmc.one_step_update(U, grad_U, epsilon, L, current_q, verbose=True)
+
+    if the_dae.logging.has_key('hmc'):
+        if np.any(current_q != updated_q):
+            # it would make more sense to store the acceptance likelihood
+            # instead, but right now we don't pass it as extra returned value
+            the_dae.logging['hmc']['acceptance_history'].append(1)
+        else:
+            the_dae.logging['hmc']['acceptance_history'].append(0)
+    else:
+        the_dae.logging['hmc'] = {}
+        the_dae.logging['hmc']['acceptance_history'] = []
 
     # Our function U(q) is mutating the dae in a way that makes
     # it necessary that we rewrite the parameters values at the

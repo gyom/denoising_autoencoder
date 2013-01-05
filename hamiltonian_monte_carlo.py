@@ -60,25 +60,25 @@ def one_step_update(U, grad_U, epsilon, L, current_q, verbose=False):
 
     if ((acceptance_ratio >= 1.0) or
         acceptance_ratio > np.random.random()):
-        if verbose:
-            print "Accepted move from "
-            print "    current_q : %0.2f" % current_q[0]
-            print "    current_p : %0.2f" % current_p[0]
-            print "to"
-            print "    q : %0.2f" % q[0]
-            print "    p : %0.2f" % p[0]
-            print ""
+        #if verbose:
+        #    print "Accepted move from "
+        #    print "    current_q : %0.2f" % current_q[0]
+        #    print "    current_p : %0.2f" % current_p[0]
+        #    print "to"
+        #    print "    q : %0.2f" % q[0]
+        #    print "    p : %0.2f" % p[0]
+        #    print ""
         # accept
         return q
     else:
-        if verbose:
-            print "Rejected move from "
-            print "    current_q : %0.2f" % current_q[0]
-            print "    current_p : %0.2f" % current_p[0]
-            print "to"
-            print "    q : %0.2f" % q[0]
-            print "    p : %0.2f" % p[0]
-            print ""
+        #if verbose:
+        #    print "Rejected move from "
+        #    print "    current_q : %0.2f" % current_q[0]
+        #    print "    current_p : %0.2f" % current_p[0]
+        #    print "to"
+        #    print "    q : %0.2f" % q[0]
+        #    print "    p : %0.2f" % p[0]
+        #    print ""
         # reject
         return current_q
 
