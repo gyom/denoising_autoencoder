@@ -14,7 +14,7 @@ import debian_spiral
 import numpy as np
 
 # Three training points, repeated 1000 times over, with noise added.
-train_noise_stddev = 10.0
+train_noise_stddev = 0.1
 N = 3000
 d = 1
 original_data = np.array([[-1.0], [0.0], [2.0]])
@@ -35,7 +35,7 @@ method = 'gradient_descent'
 
 if method == 'gradient_descent':
     import dae_train_gradient_descent
-    learning_rate = 1.0e-5
+    learning_rate = 1.0e-4
     dae_train_gradient_descent.fit(mydae,
                                    X = clean_data,
                                    noisy_X = noisy_data,
