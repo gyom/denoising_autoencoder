@@ -93,15 +93,27 @@ mydae.set_params_to_best_noisy()
 ## Produce a report of the trained model.
 ## --------------------------------------
 
-import os
+# We have to get a random value for the name of the
+# directory used to put the output results, but we
+# can't rely on the currently used random seed
+# or otherwise all the results will go the same
+# directory.
 
-# create a new directory to host the result files of this experiment
+import os
+import time
+np.random.seed(int(time.time()))
+
 if os.getenv("DENOISING_REPO")=="":
    print "Please define DENOISING_REPO environment variable"
    quit()
-output_directory = os.getenv("DENOISING_REPO")+'/denoising_autoencoder/plots/experiment_%0.6d' % int(np.random.random() * 1.0e6)
+output_directory = os.path.join(os.getenv("DENOISING_REPO"),
+                                'denoising_autoencoder/plots/experiment_%0.6d' % int(np.random.random() * 1.0e6))
+
 if not os.path.exists(output_directory):
     os.makedirs(output_directory)
+
+
+
 
 
 import matplotlib

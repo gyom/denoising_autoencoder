@@ -1,8 +1,5 @@
 #!/usr/bin/env python
 
-import numpy as np
-np.random.seed(38734)
-
 import dae
 import debian_spiral
 import numpy as np
@@ -23,7 +20,7 @@ train_noise_stddev = 0.1
 N = 9
 d = 1
 original_data = np.array([[-0.5], [0.0], [0.5]])
-clean_data = np.tile(original_data, (N/3, 1))
+clean_data = np.tile(original_data, (N/3, d))
 np.random.shuffle(clean_data)
 noisy_data = clean_data + np.random.normal(size = clean_data.shape,
                                            scale = train_noise_stddev)
@@ -38,7 +35,7 @@ batch_size = min(100,noisy_data.shape[0])
 method = 'gradient_descent'
 
 if method == 'gradient_descent':
-    n_epochs = 50000
+    n_epochs = 500
     learning_rate = 1.0e-5
     import dae_train_gradient_descent
     dae_train_gradient_descent.fit(mydae,
@@ -79,27 +76,34 @@ for (x,corr_x) in zip(clean_data[0:20],noisy_data[0:20]):
     print xx,xc,r,error
     n_error+=error
 print "GRADIENT SIGN ERROR RATE = ",n_error/float(n)
-   
 
-<<<<<<< .merge_file_y23ww7
-
-=======
-#quit()
->>>>>>> .merge_file_7T0riR
 
 ## --------------------------------------
 ## Produce a report of the trained model.
 ## --------------------------------------
 
-import os
 
-# create a new directory to host the result files of this experiment
+# We have to get a random value for the name of the
+# directory used to put the output results, but we
+# can't rely on the currently used random seed
+# or otherwise all the results will go the same
+# directory.
+
+import os
+import time
+np.random.seed(int(time.time()))
+
 if os.getenv("DENOISING_REPO")=="":
    print "Please define DENOISING_REPO environment variable"
    quit()
-output_directory = os.getenv("DENOISING_REPO")+'/denoising_autoencoder/plots/experiment_%0.6d' % int(np.random.random() * 1.0e6)
+output_directory = os.path.join(os.getenv("DENOISING_REPO"),
+                                'denoising_autoencoder/plots/experiment_%0.6d' % int(np.random.random() * 1.0e6))
+
 if not os.path.exists(output_directory):
     os.makedirs(output_directory)
+
+
+
 
 
 import matplotlib
@@ -152,17 +156,48 @@ def plot_reconstruction_function(mydae, outputfile, n_buckets = 30, domain_start
 
     domain_values = np.linspace(domain_start, domain_end, n_buckets)
 
-    print "Making predictions for the grid."
-    r_values = mydae.encode_decode(domain_values.reshape((-1,1)))
+    #print "Making predictions for the grid."
+    r_values = mydae.encode_decode(domain_values.reshape((-1,1))).reshape((-1,))
 
-    print "Generating plot."
+    #print "Generating plot."
     pylab.hold(True)
 
     p1 = pylab.plot(domain_values, r_values, c='#f9a21d')
     p2 = pylab.plot(domain_values, domain_values, c='#1861cd')
     
     pylab.axis([domain_start, domain_end, domain_start, domain_end])
-    pylab.legend([p1,p2], ["$r(x)$", "$x$"])
+    pylab.legend([p1,p2], ["r(x)", "x"])
+    pylab.draw()
+    pylab.savefig(outputfile, dpi=300)
+    pylab.close()
+
+
+def plot_reconstruction_function_minus_x_over_lambda(mydae, outputfile, n_buckets = 30, domain_start = -3.0, domain_end = 3.0, lambda_constant = 1.0, comparison_dlogp = None):
+
+    # If we'd rather have (r(x)-x)/lambda instead of plotting r(x) vs x,
+    # we can use this method.
+
+    # If you want to supply a function that gives the values of dlogp(x)/dx
+    # to compare the two curves, you can do so with the comparison_dlogp argument.
+    # It takes a function of an array and returns an array.
+    # (The code for that hasn't been tested once yet.)
+
+    if not (lambda_constant > 0):
+        error("Your lambda has to be > 0 for (r(x)-x)/lambda to make sense.")
+
+    domain_values = np.linspace(domain_start, domain_end, n_buckets)
+    r_values = mydae.encode_decode(domain_values.reshape((-1,1))).reshape((-1,))
+
+    pylab.hold(True)
+    p1 = pylab.plot(domain_values, (r_values - domain_values) / lambda_constant, c='#56ac0b', linewidth=3.0)
+    
+    if not (comparison_dlogp == None):
+        dlogp_values = comparison_dlogp(domain_values)
+        p2 = pylab.plot(domain_values, dlogp_values, c='#b00b3b', linewidth=2.0)
+        pylab.legend([p1,p2], ["(r(x)-x)/lambda", "dlogp(x)/dx"])
+    else:
+        pylab.legend([p1], ["(r(x)-x)/lambda"])
+
     pylab.draw()
     pylab.savefig(outputfile, dpi=300)
     pylab.close()
@@ -179,6 +214,11 @@ plot_reconstruction_function(mydae, os.path.join(output_directory, 'rx_versus_x_
                               n_buckets = 1000,
                               domain_start = -0.1, domain_end = 0.1)
 
+
+plot_reconstruction_function_minus_x_over_lambda(mydae, os.path.join(output_directory, 'rx_minus_x.png'),
+                                                 n_buckets = 1000,
+                                                 domain_start = -3.0, domain_end = 3.0,
+                                                 lambda_constant = train_noise_stddev)
 
 
 ###################################
@@ -252,6 +292,12 @@ contents = """
     <img src='rx_versus_x.png' width='600px'/>
 </div>
 
+<h3>(r(x) - x) / lambda</h3>
+<div class='listing'>
+    <img src='rx_minus_x.png' width='600px'/>
+</div>
+
+
 </body>
 </html>""" % (hyperparams_contents,
               params_contents)
@@ -259,4 +305,4 @@ contents = """
 f.write(contents)
 f.close()
 
-
+print "Wrote results in " + html_file_path
