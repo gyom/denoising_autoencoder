@@ -49,8 +49,8 @@ if method == 'gradient_descent':
                                    learning_rate = learning_rate,
                                    verbose = True)
 elif method == 'gradient_descent_stages':
-    n_epochs = (30000,10000,10000,10000)
-    learning_rate = (.04,.02,.01,.005)
+    n_epochs = (1000,2000,3000,10000)
+    learning_rate = (1e-3,1e-4,3e-5,1e-5)
     import dae_train_gradient_descent
     for (n_ep,lr) in zip(n_epochs,learning_rate):
          print "learning_rate = %f for %d epochs"%(lr,n_ep)
@@ -81,7 +81,7 @@ for (x,corr_x) in zip(clean_data[0:20],noisy_data[0:20]):
 print "GRADIENT SIGN ERROR RATE = ",n_error/float(n)
    
 
-quit()
+#quit()
 
 ## --------------------------------------
 ## Produce a report of the trained model.
@@ -90,7 +90,10 @@ quit()
 import os
 
 # create a new directory to host the result files of this experiment
-output_directory = '/u/alaingui/umontreal/denoising_autoencoder/plots/experiment_%0.6d' % int(np.random.random() * 1.0e6)
+if os.getenv("DENOISING_REPO")=="":
+   print "Please define DENOISING_REPO environment variable"
+   quit()
+output_directory = os.getenv("DENOISING_REPO")+'/denoising_autoencoder/plots/experiment_%0.6d' % int(np.random.random() * 1.0e6)
 if not os.path.exists(output_directory):
     os.makedirs(output_directory)
 
@@ -189,10 +192,10 @@ if method == 'hmc':
     <p>frogleap jumps  : %d</p>
     <p>epsilon : %f</p>
     """ % (L, epsilon)
-elif method == 'gradient_descent' or method == 'gradient_descent_multi_stage':
+elif method == 'gradient_descent' or method == 'gradient_descent_stages':
     hyperparams_contents_for_method = """
-    <p>learning rate  : %f</p>
-    """ % (learning_rate,)
+    <p>learning rate  : %s </p>
+    """ % (str(learning_rate),)
 else:
     error("Unknown value for method.")
 
@@ -201,13 +204,13 @@ hyperparams_contents = """
 <p>nbr hidden  units : %d</p>
 
 <p>batch size : %d</p>
-<p>epochs : %d</p>
+<p>epochs : %s</p>
 %s
 <p>training noise : %f</p>
 """ % (mydae.n_inputs,
        mydae.n_hiddens,
        batch_size,
-       n_epochs,
+       str(n_epochs),
        hyperparams_contents_for_method,
        train_noise_stddev)
 
