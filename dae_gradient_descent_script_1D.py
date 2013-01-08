@@ -2,8 +2,8 @@
 
 import dae
 #dae = reload(dae)
-mydae = dae.DAE(n_inputs=2,
-                n_hiddens=10)
+mydae = dae.DAE(n_inputs=1,
+                n_hiddens=20)
 
 ## ----------------------
 ## Get the training data.
@@ -12,49 +12,36 @@ mydae = dae.DAE(n_inputs=2,
 import debian_spiral
 import numpy as np
 
-n_spiral_samples = 3
-spiral_samples_noise_stddev = 0.001
-angle_restriction = 0.3
-data = debian_spiral.sample(n_spiral_samples, spiral_samples_noise_stddev,
-                            want_sorted_data = False, angle_restriction = angle_restriction)
+# Three training points, repeated 1000 times over, with noise added.
+train_noise_stddev = 0.1
+N = 3000
+d = 1
+original_data = np.array([[-1.0], [0.0], [2.0]])
+clean_data = np.tile(original_data, (N/3, 1))
+np.random.shuffle(clean_data)
+noisy_data = clean_data + np.random.normal(size = clean_data.shape,
+                                           scale = train_noise_stddev)
 
 
 ## -----------------------------------
 ## Fit the model to the training data.
 ## -----------------------------------
 
-batch_size = 3
-n_epochs = 10000
-train_noise_stddev = 0.1
+batch_size = 100
+n_epochs = 1000
 
 method = 'gradient_descent'
-#method = 'gradient_descent_multi_stage'
 
 if method == 'gradient_descent':
     import dae_train_gradient_descent
-    learning_rate = 1.0e-3
+    learning_rate = 1.0e-2
     dae_train_gradient_descent.fit(mydae,
-                                   data,
-                                   batch_size, n_epochs,
-                                   train_noise_stddev, learning_rate,
-                                   verbose=True)
-elif method == 'gradient_descent_multi_stage':
-    import dae_train_gradient_descent
-    for learning_rate in [1.0e-3, 1.0e-4, 1.0e-6]:
-        dae_train_gradient_descent.fit(mydae,
-                                       data,
-                                       batch_size, n_epochs,
-                                       train_noise_stddev, learning_rate,
-                                       verbose=True)
-elif method == 'hmc':
-    import dae_train_hmc
-    L = 100
-    epsilon = 0.01
-    dae_train_hmc.fit(mydae,
-                      data,
-                      batch_size, n_epochs,
-                      train_noise_stddev, L, epsilon,
-                      verbose=True)
+                                   X = clean_data,
+                                   noisy_X = noisy_data,
+                                   batch_size = batch_size,
+                                   n_epochs = n_epochs,
+                                   learning_rate = learning_rate,
+                                   verbose = True)
 else:
     error("Unrecognized training method.")
 
@@ -62,6 +49,7 @@ else:
 mydae.set_params_to_best_noisy()
 # mydae.set_params_to_best_noiseless()
 
+quit()
 
 ## --------------------------------------
 ## Produce a report of the trained model.
@@ -112,11 +100,11 @@ plot_training_loss_history(mydae, os.path.join(output_directory, 'absolute_losse
 plot_training_loss_history(mydae, os.path.join(output_directory, 'absolute_losses_start_to_end.png'), -1)
 
 
-################################
-##                            ##
-## spiral reconstruction grid ##
-##                            ##
-################################
+##########################################
+##                                      ##
+## plotting the reconstruction function ##
+##                                      ##
+##########################################
 
 def plot_grid_reconstruction_grid(mydae, outputfile, plotgrid_N_buckets = 30, window_width = 0.3):
 

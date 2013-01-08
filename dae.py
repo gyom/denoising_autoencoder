@@ -135,7 +135,7 @@ class DAE(object):
     def encode_decode(self, x):
         return self.theano_encode_decode(self.W, self.b, self.c, x)
 
-    def model_loss(self, x, noise_stddev = 0.0):
+    def model_loss(self, X, noisy_X = None, noise_stddev = 0.0):
         """
         Computes the error of the model with respect
         to the total cost.
@@ -148,10 +148,17 @@ class DAE(object):
         loss: array-like, shape (n_examples,)
         """
 
-        if noise_stddev > 0.0:
-            return self.theano_loss(self.W, self.b, self.c, x + numpy.random.normal(scale=noise_stddev, size=x.shape), x)
-        else:
-            return self.theano_loss(self.W, self.b, self.c, x, x)
+        # The preferred way is to specify noisy_X,
+        # but we'll still go with the old noise_stddev.
+
+        if noisy_X == None:
+            if noise_stddev > 0.0:
+                noisy_X = X + numpy.random.normal(scale = noise_stddev, size = X.shape)
+            else:
+                noisy_X = X
+        
+        return self.theano_loss(self.W, self.b, self.c, noisy_X, X)
+
 
     def reset_params(self):
         self.W = numpy.random.uniform( low = -1.0, high = 1.0, size=(self.n_inputs, self.n_hiddens) )
@@ -174,7 +181,7 @@ class DAE(object):
         self.b = self.best_noiseless_params['b']
         self.c = self.best_noiseless_params['c']
 
-    def perform_logging(self, X, noise_stddev, verbose = False):
+    def perform_logging(self, X, noisy_X, noise_stddev = None, verbose = False):
 
         # The 'X' parameter is used to log the gradients.
         # We are recomputing them and wasting computation here, but
@@ -186,7 +193,10 @@ class DAE(object):
         # 'noisy' to 'noiseless'.
 
         # 'noisy'
-        noisy_all_losses, noisy_all_abs_act, noisy_all_abs_ract = self.model_loss(X, noise_stddev = noise_stddev)
+        if noise_stddev == None:
+            noisy_all_losses, noisy_all_abs_act, noisy_all_abs_ract = self.model_loss(X, noisy_X = noisy_X)
+        else:
+            noisy_all_losses, noisy_all_abs_act, noisy_all_abs_ract = self.model_loss(X, noise_stddev = noise_stddev)
 
         self.logging['noisy']['mean_abs_loss'].append( numpy.abs(noisy_all_losses).mean() )
         self.logging['noisy']['var_abs_loss'].append( numpy.abs(noisy_all_losses).var() )
@@ -209,10 +219,10 @@ class DAE(object):
                 self.best_noisy_params['W'] = self.W
                 self.best_noisy_params['b'] = self.b
                 self.best_noisy_params['c'] = self.c
-                print "Updated the best noisy loss as %0.6f" % self.logging['noisy']['mean_abs_loss'][-1]
+                #print "Updated the best noisy loss as %0.6f" % self.logging['noisy']['mean_abs_loss'][-1]
 
         # 'noiseless'
-        noiseless_all_losses, noiseless_all_abs_act, noiseless_all_abs_ract = self.model_loss(X, noise_stddev = 0.0)
+        noiseless_all_losses, noiseless_all_abs_act, noiseless_all_abs_ract = self.model_loss(X, noisy_X = X)
 
         self.logging['noiseless']['mean_abs_loss'].append( numpy.abs(noiseless_all_losses).mean() )
         self.logging['noiseless']['var_abs_loss'].append( numpy.abs(noiseless_all_losses).var() )
@@ -235,7 +245,7 @@ class DAE(object):
                 self.best_noiseless_params['W'] = self.W
                 self.best_noiseless_params['b'] = self.b
                 self.best_noiseless_params['c'] = self.c
-                print "Updated the best noiseless loss as %0.6f" % self.logging['noiseless']['mean_abs_loss'][-1]
+                #print "Updated the best noiseless loss as %0.6f" % self.logging['noiseless']['mean_abs_loss'][-1]
 
 
         if verbose:

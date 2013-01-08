@@ -11,7 +11,7 @@ import numpy as np
 # for the flush
 import sys
 
-def perform_one_update(the_dae, X, noise_stddev, learning_rate, simulate_only  = False):
+def perform_one_update(the_dae, X, noisy_X, learning_rate, simulate_only  = False):
     """
     Perform one step of gradient descent on the
     DAE objective using the examples {\bf X}.
@@ -21,16 +21,16 @@ def perform_one_update(the_dae, X, noise_stddev, learning_rate, simulate_only  =
         X: array-like, shape (n_examples, n_inputs)
     """
         
-    if noise_stddev > 0.0:
-        perturbed_X = X + np.random.normal(scale = noise_stddev, size=X.shape)
-    else:
-        perturbed_X = X.copy()
+    #if noise_stddev > 0.0:
+    #    perturbed_X = X + np.random.normal(scale = noise_stddev, size=X.shape)
+    #else:
+    #    perturbed_X = X.copy()
 
     grad_W, grad_b, grad_c = the_dae.theano_gradients(the_dae.W,
                                                       the_dae.b,
                                                       the_dae.c,
-                                                      perturbed_X,
-                                                      X.copy())
+                                                      noisy_X,
+                                                      X)
 
     if not simulate_only:
         the_dae.W = the_dae.W - learning_rate * grad_W
@@ -40,7 +40,8 @@ def perform_one_update(the_dae, X, noise_stddev, learning_rate, simulate_only  =
     return (grad_W, grad_b, grad_c)
 
 
-def fit(the_dae, X, batch_size, n_epochs, noise_stddev, learning_rate, verbose=False):
+def fit(the_dae, X, noisy_X, batch_size,
+        n_epochs, learning_rate, verbose=False):
     """
     Fit the model to the data X.
     
@@ -100,14 +101,17 @@ def fit(the_dae, X, batch_size, n_epochs, noise_stddev, learning_rate, verbose=F
             
         for (start, end) in inds_ranges:
             X_minibatch = X[inds[start:end]]
+            noisy_X_minibatch = noisy_X[inds[start:end]]
             # calling the function defined here in
             # dae_train_gradient_descent.perform_one_update
-            perform_one_update(the_dae, X_minibatch, noise_stddev, learning_rate)
+            perform_one_update(the_dae, X_minibatch, noisy_X_minibatch, learning_rate)
 
         if the_dae.want_logging:
             if verbose and (epoch % 100 == 0):
                 sys.stdout.flush()
                 print "Epoch %d" % epoch
-                the_dae.perform_logging(X, noise_stddev, verbose = True)
+                the_dae.perform_logging(X, noisy_X = noisy_X, verbose = True)
+                #the_dae.perform_logging(X, noise_stddev, verbose = True)
             else:
-                the_dae.perform_logging(X, noise_stddev, verbose = False)
+                the_dae.perform_logging(X, noisy_X = noisy_X, verbose = False)
+                #the_dae.perform_logging(X, noise_stddev, verbose = False)
