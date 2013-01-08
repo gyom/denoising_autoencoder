@@ -1,16 +1,18 @@
 #!/usr/bin/env python
 
 import dae
+import debian_spiral
+import numpy as np
+
+np.random.seed(99)
+
 #dae = reload(dae)
 mydae = dae.DAE(n_inputs=1,
-                n_hiddens=20)
+                n_hiddens=4)
 
 ## ----------------------
 ## Get the training data.
 ## ----------------------
-
-import debian_spiral
-import numpy as np
 
 # Three training points, repeated 1000 times over, with noise added.
 train_noise_stddev = 0.1
@@ -43,8 +45,8 @@ if method == 'gradient_descent':
                                    learning_rate = learning_rate,
                                    verbose = True)
 elif method == 'gradient_descent_stages':
-    n_epochs = (6000,10000,10000,20000)
-    learning_rate = (.05,.03,.01,.003)
+    n_epochs = (30000,10000,10000,10000)
+    learning_rate = (.04,.02,.01,.005)
     import dae_train_gradient_descent
     for (n_ep,lr) in zip(n_epochs,learning_rate):
          print "learning_rate = %f for %d epochs"%(lr,n_ep)
