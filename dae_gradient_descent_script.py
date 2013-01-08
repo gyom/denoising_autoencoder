@@ -6,7 +6,7 @@ np.random.seed(38734)
 import dae
 #dae = reload(dae)
 mydae = dae.DAE(n_inputs=2,
-                n_hiddens=80,
+                n_hiddens=500,
                 output_scaling_factor=2.0)
 
 ## ----------------------
@@ -18,14 +18,14 @@ import debian_spiral
 # Now that we fix the training data, we have to insist
 # on the difference between original data and noisy replicated
 # versions of that original data.
-n_spiral_original_samples = 3
+n_spiral_original_samples = 100
 spiral_samples_noise_stddev = 0.0
 angle_restriction = 0.3
 original_data = debian_spiral.sample(n_spiral_original_samples, spiral_samples_noise_stddev,
                                      want_sorted_data = False, angle_restriction = angle_restriction)
 
 
-replication_factor = 1000
+replication_factor = 10
 n_spiral_replicated_samples = n_spiral_original_samples * replication_factor
 
 train_noise_stddev = 0.01

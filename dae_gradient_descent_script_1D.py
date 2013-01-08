@@ -35,7 +35,7 @@ noisy_data = clean_data + np.random.normal(size = clean_data.shape,
 
 batch_size = min(100,noisy_data.shape[0])
 
-method = 'gradient_descent_stages'
+method = 'gradient_descent'
 
 if method == 'gradient_descent':
     n_epochs = 50000
@@ -81,7 +81,7 @@ for (x,corr_x) in zip(clean_data[0:20],noisy_data[0:20]):
 print "GRADIENT SIGN ERROR RATE = ",n_error/float(n)
    
 
-quit()
+
 
 ## --------------------------------------
 ## Produce a report of the trained model.
