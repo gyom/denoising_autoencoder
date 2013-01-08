@@ -1,9 +1,12 @@
 #!/usr/bin/env python
 
+import numpy as np
+np.random.seed(38734)
+
 import dae
 #dae = reload(dae)
 mydae = dae.DAE(n_inputs=2,
-                n_hiddens=20,
+                n_hiddens=80,
                 output_scaling_factor=2.0)
 
 ## ----------------------
@@ -11,21 +14,21 @@ mydae = dae.DAE(n_inputs=2,
 ## ----------------------
 
 import debian_spiral
-import numpy as np
 
 # Now that we fix the training data, we have to insist
 # on the difference between original data and noisy replicated
 # versions of that original data.
-n_spiral_original_samples = 5
-replication_factor = 500
-n_spiral_replicated_samples = n_spiral_original_samples * replication_factor
+n_spiral_original_samples = 3
 spiral_samples_noise_stddev = 0.0
 angle_restriction = 0.3
 original_data = debian_spiral.sample(n_spiral_original_samples, spiral_samples_noise_stddev,
                                      want_sorted_data = False, angle_restriction = angle_restriction)
 
 
-train_noise_stddev = 0.1
+replication_factor = 1000
+n_spiral_replicated_samples = n_spiral_original_samples * replication_factor
+
+train_noise_stddev = 0.01
 clean_data = np.tile(original_data, (replication_factor, 1))
 np.random.shuffle(clean_data)
 noisy_data = clean_data + np.random.normal(size = clean_data.shape,
@@ -40,7 +43,7 @@ if clean_data.shape != (n_spiral_replicated_samples, 2):
 ## -----------------------------------
 
 batch_size = 100
-n_epochs = 1000
+n_epochs = 10000
 
 
 method = 'gradient_descent'
@@ -48,7 +51,7 @@ method = 'gradient_descent'
 
 if method == 'gradient_descent':
     import dae_train_gradient_descent
-    learning_rate = 1.0
+    learning_rate = 1.0e-6
     dae_train_gradient_descent.fit(mydae,
                                    X = clean_data,
                                    noisy_X = noisy_data,

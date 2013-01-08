@@ -39,6 +39,11 @@ def perform_one_update(the_dae, X, noisy_X, learning_rate, simulate_only  = Fals
         the_dae.b  = the_dae.b  - learning_rate * grad_b
         the_dae.c  = the_dae.c  - learning_rate * grad_c
 
+    #print grad_Wb
+    #print grad_Wc
+    #print grad_b
+    #print grad_c
+
     return (grad_Wb, grad_Wc, grad_b, grad_c)
 
 
