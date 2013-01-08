@@ -132,8 +132,8 @@ class DAE(object):
                                                        T.grad(sum_loss, b),
                                                        T.grad(sum_loss, c)])
 
-    def encode_decode(self, x):
-        return self.theano_encode_decode(self.W, self.b, self.c, x)
+    def encode_decode(self, X):
+        return self.theano_encode_decode(self.W, self.b, self.c, X)
 
     def model_loss(self, X, noisy_X = None, noise_stddev = 0.0):
         """

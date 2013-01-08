@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 
+import numpy as np
+np.random.seed(38734)
+
 import dae
 import debian_spiral
 import numpy as np
@@ -8,7 +11,8 @@ np.random.seed(99)
 
 #dae = reload(dae)
 mydae = dae.DAE(n_inputs=1,
-                n_hiddens=4)
+                n_hiddens=20,
+                output_scaling_factor=5.0)
 
 ## ----------------------
 ## Get the training data.
@@ -103,17 +107,17 @@ def plot_training_loss_history(mydae, outputfile, last_index = -1):
                    + s * np.sqrt(mydae.logging['noisy']['var_abs_loss'][:last_index]),
                    c='#f9a21d', linestyle='dashed')
 
-        p2, = pylab.plot(mydae.logging['noiseless']['mean_abs_loss'][:last_index], label='noiseless', c='#9418cd', linewidth = 2)
-        for s in [-1.0, 1.0]:
-            pylab.plot(mydae.logging['noiseless']['mean_abs_loss'][:last_index]
-                       + s * np.sqrt(mydae.logging['noiseless']['var_abs_loss'][:last_index]),
-                       c='#d91986', linestyle='dashed')
+    p2, = pylab.plot(mydae.logging['noiseless']['mean_abs_loss'][:last_index], label='noiseless', c='#9418cd', linewidth = 2)
+    for s in [-1.0, 1.0]:
+        pylab.plot(mydae.logging['noiseless']['mean_abs_loss'][:last_index]
+                   + s * np.sqrt(mydae.logging['noiseless']['var_abs_loss'][:last_index]),
+                   c='#d91986', linestyle='dashed')
 
-            pylab.title('Absolute Losses')
-            pylab.legend([p1,p2], ["noisy", "noiseless"])
-            pylab.draw()
-            pylab.savefig(outputfile, dpi=300)
-            pylab.close()
+    pylab.title('Absolute Losses')
+    pylab.legend([p1,p2], ["noisy", "noiseless"])
+    pylab.draw()
+    pylab.savefig(outputfile, dpi=300)
+    pylab.close()
 
 # We want to pick some interesting index at which most of the learning has already taken place.
 A = mydae.logging['noiseless']['mean_abs_loss'] < 4.0 * mydae.logging['noiseless']['mean_abs_loss'][-1]
@@ -121,6 +125,9 @@ if np.any(A):
     interesting_index = np.where( A )[0][0]
 else:
     interesting_index = int(n_epochs / 10)
+if interesting_index == 0:
+    interesting_index = int(n_epochs / 10)
+
 del A
 print "interesting_index = %d" % interesting_index
 
@@ -134,59 +141,37 @@ plot_training_loss_history(mydae, os.path.join(output_directory, 'absolute_losse
 ##                                      ##
 ##########################################
 
-def plot_grid_reconstruction_grid(mydae, outputfile, plotgrid_N_buckets = 30, window_width = 0.3):
+def plot_reconstruction_function(mydae, outputfile, n_buckets = 30, domain_start = -3.0, domain_end = 3.0):
 
-    (plotgrid_X, plotgrid_Y) = np.meshgrid(np.arange(- window_width,
-                                                     window_width,
-                                                     2 * window_width / plotgrid_N_buckets),
-                                           np.arange(- window_width,
-                                                     window_width,
-                                                     2 * window_width / plotgrid_N_buckets))
-    plotgrid = np.vstack([np.hstack(plotgrid_X), np.hstack(plotgrid_Y)]).T
-
-    # Not sure it's worth truncating some elements now that we're
-    # producing more plots.
-    #    D = np.sqrt(plotgrid[:,0]**2 + plotgrid[:,1]**2)
-    #    plotgrid = plotgrid[D<0.7]
-    #    print plotgrid_X.shape
-    #    print plotgrid_Y.shape
-    #    print "Will keep only %d points on the plotting grid after starting from %d." % (plotgrid.shape[0], plotgrid_X.shape[0])
+    domain_values = np.linspace(domain_start, domain_end, n_buckets)
 
     print "Making predictions for the grid."
-
-    grid_pred = mydae.encode_decode(plotgrid)
-    grid_error = np.sqrt(((grid_pred - plotgrid)**2).sum(axis=1)).mean()
-    print "grid_error = %0.6f (not necessarily a relevant information)" % grid_error
-
+    r_values = mydae.encode_decode(domain_values.reshape((-1,1)))
 
     print "Generating plot."
-
-    # print only one point in 100
-    # pylab.scatter(data[0:-1:100,0], data[0:-1:100,1], c='#f9a21d')
-    pylab.scatter(data[:,0], data[:,1], c='#f9a21d')
     pylab.hold(True)
-    arrows_scaling = 1.0
-    pylab.quiver(plotgrid[:,0],
-                 plotgrid[:,1],
-                 arrows_scaling * (grid_pred[:,0] - plotgrid[:,0]),
-                 arrows_scaling * (grid_pred[:,1] - plotgrid[:,1]))
+
+    p1 = pylab.plot(domain_values, r_values, c='#f9a21d')
+    p2 = pylab.plot(domain_values, domain_values, c='#1861cd')
+    
+    pylab.axis([domain_start, domain_end, domain_start, domain_end])
+    pylab.legend([p1,p2], ["$r(x)$", "$x$"])
     pylab.draw()
-    # pylab.axis([-0.6, 0.6, -0.6, 0.6])
-    # pylab.axis([-0.3, 0.3, -0.3, 0.3])
-    pylab.axis([-window_width*1.0, window_width*1.0, -window_width*1.0, window_width*1.0])
     pylab.savefig(outputfile, dpi=300)
     pylab.close()
 
-    return grid_error
 
 
-plot_grid_reconstruction_grid(mydae, os.path.join(output_directory, 'spiral_reconstruction_grid_full.png'),
-                              plotgrid_N_buckets = 30,
-                              window_width = 1.0)
 
-plot_grid_reconstruction_grid(mydae, os.path.join(output_directory, 'spiral_reconstruction_grid_zoomed_center.png'),
-                              plotgrid_N_buckets = 30,
-                              window_width = 0.3)
+plot_reconstruction_function(mydae, os.path.join(output_directory, 'rx_versus_x.png'),
+                              n_buckets = 1000,
+                              domain_start = -3.0, domain_end = 3.0)
+
+
+plot_reconstruction_function(mydae, os.path.join(output_directory, 'rx_versus_x_zoomed_on_origin.png'),
+                              n_buckets = 1000,
+                              domain_start = -0.1, domain_end = 0.1)
+
 
 
 ###################################
@@ -208,6 +193,8 @@ elif method == 'gradient_descent' or method == 'gradient_descent_multi_stage':
     hyperparams_contents_for_method = """
     <p>learning rate  : %f</p>
     """ % (learning_rate,)
+else:
+    error("Unknown value for method.")
 
 hyperparams_contents = """
 <p>nbr visible units : %d</p>
@@ -215,23 +202,14 @@ hyperparams_contents = """
 
 <p>batch size : %d</p>
 <p>epochs : %d</p>
-
 %s
-
-<p>training noise : %0.6f</p>
-
-<p>dataset points : %d</p>
-<p>dataset noise : %0.6f</p>
-<p>angle restriction : %0.6f</p>
+<p>training noise : %f</p>
 """ % (mydae.n_inputs,
        mydae.n_hiddens,
        batch_size,
        n_epochs,
        hyperparams_contents_for_method,
-       train_noise_stddev,
-       n_spiral_samples,
-       spiral_samples_noise_stddev,
-       angle_restriction)
+       train_noise_stddev)
 
 params_contents = ""
 
@@ -263,8 +241,8 @@ contents = """
 
 <h3>Training Loss</h3>
 <div class='listing'>
-    <img src='spiral_reconstruction_grid_full.png' width='600px'/>
-    <img src='spiral_reconstruction_grid_zoomed_center.png' width='600px'/>
+    <img src='rx_versus_x_zoomed_on_origin.png' width='600px'/>
+    <img src='rx_versus_x.png' width='600px'/>
 </div>
 
 </body>
