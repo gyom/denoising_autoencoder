@@ -17,7 +17,7 @@ mydae = dae.DAE(n_inputs=1,
 
 # Three training points, repeated 1000 times over, with noise added.
 train_noise_stddev = 0.1
-N = 9
+N = 27
 d = 1
 original_data = np.array([[-0.5], [0.0], [0.5]])
 clean_data = np.tile(original_data, (N/3, d))
@@ -35,7 +35,7 @@ batch_size = min(100,noisy_data.shape[0])
 method = 'gradient_descent'
 
 if method == 'gradient_descent':
-    n_epochs = 500
+    n_epochs = 10000
     learning_rate = 1.0e-5
     import dae_train_gradient_descent
     dae_train_gradient_descent.fit(mydae,
