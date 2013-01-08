@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 
+import numpy as np
+np.random.seed(38734)
+
 import dae
 #dae = reload(dae)
 mydae = dae.DAE(n_inputs=1,
@@ -9,9 +12,6 @@ mydae = dae.DAE(n_inputs=1,
 ## ----------------------
 ## Get the training data.
 ## ----------------------
-
-import debian_spiral
-import numpy as np
 
 # Three training points, repeated 1000 times over, with noise added.
 train_noise_stddev = 0.1
