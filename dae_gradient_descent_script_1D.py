@@ -14,9 +14,9 @@ import numpy as np
 
 # Three training points, repeated 1000 times over, with noise added.
 train_noise_stddev = 0.1
-N = 3000
+N = 9
 d = 1
-original_data = np.array([[-1.0], [0.0], [2.0]])
+original_data = np.array([[-0.5], [0.0], [0.5]])
 clean_data = np.tile(original_data, (N/3, 1))
 np.random.shuffle(clean_data)
 noisy_data = clean_data + np.random.normal(size = clean_data.shape,
@@ -27,14 +27,14 @@ noisy_data = clean_data + np.random.normal(size = clean_data.shape,
 ## Fit the model to the training data.
 ## -----------------------------------
 
-batch_size = 100
-n_epochs = 1000
+batch_size = min(100,noisy_data.shape[0])
 
-method = 'gradient_descent'
+method = 'gradient_descent_stages'
 
 if method == 'gradient_descent':
-    import dae_train_gradient_descent
+    n_epochs = 50000
     learning_rate = 1.0e-2
+    import dae_train_gradient_descent
     dae_train_gradient_descent.fit(mydae,
                                    X = clean_data,
                                    noisy_X = noisy_data,
@@ -42,12 +42,38 @@ if method == 'gradient_descent':
                                    n_epochs = n_epochs,
                                    learning_rate = learning_rate,
                                    verbose = True)
+elif method == 'gradient_descent_stages':
+    n_epochs = (6000,10000,10000,20000)
+    learning_rate = (.05,.03,.01,.003)
+    import dae_train_gradient_descent
+    for (n_ep,lr) in zip(n_epochs,learning_rate):
+         print "learning_rate = %f for %d epochs"%(lr,n_ep)
+         dae_train_gradient_descent.fit(mydae,
+                                       X = clean_data,
+                                       noisy_X = noisy_data,
+                                       batch_size = batch_size,
+                                       n_epochs = n_ep,
+                                       learning_rate = lr,
+                                       verbose = True)
 else:
-    error("Unrecognized training method.")
+    print "unknown method: %s"%method
 
 
 mydae.set_params_to_best_noisy()
 # mydae.set_params_to_best_noiseless()
+
+n_error = 0
+n = 0
+for (x,corr_x) in zip(clean_data[0:20],noisy_data[0:20]):
+    n+=1
+    xx=x[0]
+    xc=corr_x[0]
+    r = mydae.encode_decode(corr_x.reshape(1,d))[0,0]
+    error = np.sign(xc-xx)!=np.sign(xc-r)
+    print xx,xc,r,error
+    n_error+=error
+print "GRADIENT SIGN ERROR RATE = ",n_error/float(n)
+   
 
 quit()
 

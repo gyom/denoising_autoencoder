@@ -94,7 +94,6 @@ def fit(the_dae, X, noisy_X, batch_size,
         print inds_ranges
 
     for epoch in range(n_epochs):
-
         # Shuffle the 'inds', because we don't modify
         # the 'inds_ranges'. Only one of them has to change.
         np.random.shuffle(inds)
@@ -107,9 +106,9 @@ def fit(the_dae, X, noisy_X, batch_size,
             perform_one_update(the_dae, X_minibatch, noisy_X_minibatch, learning_rate)
 
         if the_dae.want_logging:
-            if verbose and (epoch % 100 == 0):
+            if verbose and (epoch % 1000 == 0):
                 sys.stdout.flush()
-                print "Epoch %d" % epoch
+                print "Epoch %d:" % epoch,
                 the_dae.perform_logging(X, noisy_X = noisy_X, verbose = True)
                 #the_dae.perform_logging(X, noise_stddev, verbose = True)
             else:
