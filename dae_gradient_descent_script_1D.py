@@ -35,7 +35,7 @@ method = 'gradient_descent'
 
 if method == 'gradient_descent':
     import dae_train_gradient_descent
-    learning_rate = 1.0e-4
+    learning_rate = 1.0e-5
     dae_train_gradient_descent.fit(mydae,
                                    X = clean_data,
                                    noisy_X = noisy_data,

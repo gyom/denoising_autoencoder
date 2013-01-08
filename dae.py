@@ -21,9 +21,8 @@ class DAE(object):
     def __init__(self,
                  n_inputs=None,
                  n_hiddens=None,
-                 W=None,
-                 c=None,
-                 b=None,
+                 Wc=None, Wb=None,
+                 c=None, b=None,
                  output_scaling_factor=1.0,
                  want_logging=True):
         """
@@ -35,9 +34,12 @@ class DAE(object):
             Number of inputs units
         n_hiddens : int
             Number of hidden units
-        W : array-like, shape (n_inputs, n_hiddens), optional
-            Weight matrix, where n_inputs in the number of input
-            units and n_hiddens is the number of hidden units.
+        Wc : array-like, shape (n_inputs, n_hiddens), optional
+             Weight matrix, where n_inputs in the number of input
+             units and n_hiddens is the number of hidden units.
+        Wb : array-like, shape (n_inputs, n_hiddens), optional
+             Weight matrix, where n_inputs in the number of input
+             units and n_hiddens is the number of hidden units.
         c : array-like, shape (n_hiddens,), optional
             Biases of the hidden units
         b : array-like, shape (n_inputs,), optional
@@ -57,8 +59,10 @@ class DAE(object):
         # algorithms that take the DAE instance as parameter.
         # ex : any training function
         self.reset_params()
-        if not (W == None):
-            self.W = W
+        if not (Wc == None):
+            self.Wc = Wc
+        if not (Wc == None):
+            self.Wb = Wb
         if not (c == None):
             self.c = c
         if not (b == None):
@@ -87,7 +91,7 @@ class DAE(object):
         # keep the best parameters
         self.best_noisy_params = {}
         self.best_noiseless_params = {}
-        # will have fields 'W', 'b', 'c', 'loss'
+        # will have fields 'Wb', 'Wc', 'b', 'c', 'loss'
 
 
         # then setup the theano functions once
@@ -95,23 +99,25 @@ class DAE(object):
     
     def theano_setup(self):
     
-        W = T.dmatrix('W')
+        # The matrices Wb and Wc were originally tied.
+        # Because of that, I decided to keep Wb and Wc with
+        # the same shape (instead of being transposed) to
+        # avoid disturbing the code as much as possible.
+
+        Wb = T.dmatrix('Wb')
+        Wc = T.dmatrix('Wc')
         b = T.dvector('b')
         c = T.dvector('c')
         x = T.dmatrix('x')
     
-        s = T.dot(x, W) + c
+        s = T.dot(x, Wc) + c
         # h = 1 / (1 + T.exp(-s))
         # h = T.nnet.sigmoid(s)
         h = T.tanh(s)
         # r = T.dot(h,W.T) + b
         # r = theano.printing.Print("r=")(2*T.tanh(T.dot(h,W.T) + b))
-        ract = T.dot(h,W.T) + b
+        ract = T.dot(h, Wb.T) + b
         r = self.output_scaling_factor * T.tanh(ract)
-    
-        #g  = function([W,b,c,x], h)
-        #f  = function([W,b,c,h], r)
-        #fg = function([W,b,c,x], r)
     
         # Another variable to be able to call a function
         # with a noisy x and compare it to a reference x.
@@ -126,14 +132,14 @@ class DAE(object):
         #                    which involves the all data X summed
         #                    so it's not a "vectorial" function.
 
-        self.theano_encode_decode = function([W,b,c,x], r)
-        self.theano_loss = function([W,b,c,x,y], [loss, T.abs_(s), T.abs_(ract)])
-        self.theano_gradients = function([W,b,c,x,y], [T.grad(sum_loss, W),
-                                                       T.grad(sum_loss, b),
-                                                       T.grad(sum_loss, c)])
+        self.theano_encode_decode = function([Wb,Wc,b,c,x], r)
+        self.theano_loss = function([Wb,Wc,b,c,x,y], [loss, T.abs_(s), T.abs_(ract)])
+        self.theano_gradients = function([Wb,Wc,b,c,x,y],
+                                         [T.grad(sum_loss, Wb), T.grad(sum_loss, Wc),
+                                          T.grad(sum_loss, b),  T.grad(sum_loss, c)])
 
     def encode_decode(self, X):
-        return self.theano_encode_decode(self.W, self.b, self.c, X)
+        return self.theano_encode_decode(self.Wb, self.Wc, self.b, self.c, X)
 
     def model_loss(self, X, noisy_X = None, noise_stddev = 0.0):
         """
@@ -157,11 +163,12 @@ class DAE(object):
             else:
                 noisy_X = X
         
-        return self.theano_loss(self.W, self.b, self.c, noisy_X, X)
+        return self.theano_loss(self.Wb, self.Wc, self.b, self.c, noisy_X, X)
 
 
     def reset_params(self):
-        self.W = numpy.random.uniform( low = -1.0, high = 1.0, size=(self.n_inputs, self.n_hiddens) )
+        self.Wb = numpy.random.uniform( low = -1.0, high = 1.0, size=(self.n_inputs, self.n_hiddens) )
+        self.Wc = numpy.random.uniform( low = -1.0, high = 1.0, size=(self.n_inputs, self.n_hiddens) )
         #self.W = numpy.random.uniform(
         #    low = - 4.0 * numpy.sqrt(6./(self.n_inputs + self.n_hiddens)),
         #    high = 4.0 * numpy.sqrt(6./(self.n_inputs + self.n_hiddens)),
@@ -172,12 +179,14 @@ class DAE(object):
         #self.c = numpy.zeros(self.n_hiddens)
 
     def set_params_to_best_noisy(self):
-        self.W = self.best_noisy_params['W']
+        self.Wb = self.best_noisy_params['Wb']
+        self.Wc = self.best_noisy_params['Wc']
         self.b = self.best_noisy_params['b']
         self.c = self.best_noisy_params['c']
 
     def set_params_to_best_noiseless(self):
-        self.W = self.best_noiseless_params['W']
+        self.Wb = self.best_noiseless_params['Wb']
+        self.Wc = self.best_noiseless_params['Wc']
         self.b = self.best_noiseless_params['b']
         self.c = self.best_noiseless_params['c']
 
@@ -216,7 +225,8 @@ class DAE(object):
         if ((not self.best_noisy_params.has_key('loss')) or
             self.logging['noisy']['mean_abs_loss'][-1] < self.best_noisy_params['loss']):
                 self.best_noisy_params['loss'] = self.logging['noisy']['mean_abs_loss'][-1]
-                self.best_noisy_params['W'] = self.W
+                self.best_noisy_params['Wb'] = self.Wb
+                self.best_noisy_params['Wc'] = self.Wc
                 self.best_noisy_params['b'] = self.b
                 self.best_noisy_params['c'] = self.c
                 #print "Updated the best noisy loss as %0.6f" % self.logging['noisy']['mean_abs_loss'][-1]
@@ -242,7 +252,8 @@ class DAE(object):
         if ((not self.best_noiseless_params.has_key('loss')) or
             self.logging['noiseless']['mean_abs_loss'][-1] < self.best_noiseless_params['loss']):
                 self.best_noiseless_params['loss'] = self.logging['noiseless']['mean_abs_loss'][-1]
-                self.best_noiseless_params['W'] = self.W
+                self.best_noiseless_params['Wb'] = self.Wb
+                self.best_noiseless_params['Wc'] = self.Wc
                 self.best_noiseless_params['b'] = self.b
                 self.best_noiseless_params['c'] = self.c
                 #print "Updated the best noiseless loss as %0.6f" % self.logging['noiseless']['mean_abs_loss'][-1]

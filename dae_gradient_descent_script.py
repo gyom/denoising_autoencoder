@@ -3,7 +3,8 @@
 import dae
 #dae = reload(dae)
 mydae = dae.DAE(n_inputs=2,
-                n_hiddens=10)
+                n_hiddens=20,
+                output_scaling_factor=2.0)
 
 ## ----------------------
 ## Get the training data.
@@ -12,49 +13,71 @@ mydae = dae.DAE(n_inputs=2,
 import debian_spiral
 import numpy as np
 
-n_spiral_samples = 3
-spiral_samples_noise_stddev = 0.001
+# Now that we fix the training data, we have to insist
+# on the difference between original data and noisy replicated
+# versions of that original data.
+n_spiral_original_samples = 5
+replication_factor = 500
+n_spiral_replicated_samples = n_spiral_original_samples * replication_factor
+spiral_samples_noise_stddev = 0.0
 angle_restriction = 0.3
-data = debian_spiral.sample(n_spiral_samples, spiral_samples_noise_stddev,
-                            want_sorted_data = False, angle_restriction = angle_restriction)
+original_data = debian_spiral.sample(n_spiral_original_samples, spiral_samples_noise_stddev,
+                                     want_sorted_data = False, angle_restriction = angle_restriction)
+
+
+train_noise_stddev = 0.1
+clean_data = np.tile(original_data, (replication_factor, 1))
+np.random.shuffle(clean_data)
+noisy_data = clean_data + np.random.normal(size = clean_data.shape,
+                                           scale = train_noise_stddev)
+
+if clean_data.shape != (n_spiral_replicated_samples, 2):
+    error("Wrong shape for the data.")
 
 
 ## -----------------------------------
 ## Fit the model to the training data.
 ## -----------------------------------
 
-batch_size = 3
-n_epochs = 10000
-train_noise_stddev = 0.1
+batch_size = 100
+n_epochs = 1000
+
 
 method = 'gradient_descent'
 #method = 'gradient_descent_multi_stage'
 
 if method == 'gradient_descent':
     import dae_train_gradient_descent
-    learning_rate = 1.0e-3
+    learning_rate = 1.0
     dae_train_gradient_descent.fit(mydae,
-                                   data,
-                                   batch_size, n_epochs,
-                                   train_noise_stddev, learning_rate,
+                                   X = clean_data,
+                                   noisy_X = noisy_data,
+                                   batch_size = batch_size,
+                                   n_epochs = n_epochs,
+                                   learning_rate = learning_rate,
                                    verbose=True)
 elif method == 'gradient_descent_multi_stage':
     import dae_train_gradient_descent
     for learning_rate in [1.0e-3, 1.0e-4, 1.0e-6]:
         dae_train_gradient_descent.fit(mydae,
-                                       data,
-                                       batch_size, n_epochs,
-                                       train_noise_stddev, learning_rate,
+                                       X = clean_data,
+                                       noisy_X = noisy_data,
+                                       batch_size = batch_size,
+                                       n_epochs = n_epochs,
+                                       learning_rate = learning_rate,
                                        verbose=True)
 elif method == 'hmc':
-    import dae_train_hmc
-    L = 100
-    epsilon = 0.01
-    dae_train_hmc.fit(mydae,
-                      data,
-                      batch_size, n_epochs,
-                      train_noise_stddev, L, epsilon,
-                      verbose=True)
+    error("The HMC part of the code is now essentially rotten and has to be revisited to be revived.")
+    #import dae_train_hmc
+    #L = 100
+    #epsilon = 0.01
+    #dae_train_hmc.fit(mydae,
+    #                  X = clean_data,
+    #                  noisy_X = noisy_data,
+    #                  batch_size = batch_size,
+    #                  n_epochs = n_epochs,
+    #                  L, epsilon,
+    #                  verbose=True)
 else:
     error("Unrecognized training method.")
 
@@ -147,7 +170,7 @@ def plot_grid_reconstruction_grid(mydae, outputfile, plotgrid_N_buckets = 30, wi
 
     # print only one point in 100
     # pylab.scatter(data[0:-1:100,0], data[0:-1:100,1], c='#f9a21d')
-    pylab.scatter(data[:,0], data[:,1], c='#f9a21d')
+    pylab.scatter(clean_data[:,0], clean_data[:,1], c='#f9a21d')
     pylab.hold(True)
     arrows_scaling = 1.0
     pylab.quiver(plotgrid[:,0],
@@ -204,7 +227,9 @@ hyperparams_contents = """
 
 <p>training noise : %0.6f</p>
 
-<p>dataset points : %d</p>
+<p>original dataset points   : %d</p>
+<p>replicated dataset points : %d</p>
+
 <p>dataset noise : %0.6f</p>
 <p>angle restriction : %0.6f</p>
 """ % (mydae.n_inputs,
@@ -213,7 +238,8 @@ hyperparams_contents = """
        n_epochs,
        hyperparams_contents_for_method,
        train_noise_stddev,
-       n_spiral_samples,
+       n_spiral_original_samples,
+       n_spiral_replicated_samples,
        spiral_samples_noise_stddev,
        angle_restriction)
 

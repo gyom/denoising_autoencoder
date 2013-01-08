@@ -26,18 +26,20 @@ def perform_one_update(the_dae, X, noisy_X, learning_rate, simulate_only  = Fals
     #else:
     #    perturbed_X = X.copy()
 
-    grad_W, grad_b, grad_c = the_dae.theano_gradients(the_dae.W,
-                                                      the_dae.b,
-                                                      the_dae.c,
-                                                      noisy_X,
-                                                      X)
+    grad_Wb, grad_Wc, grad_b, grad_c = the_dae.theano_gradients(the_dae.Wb,
+                                                                the_dae.Wc,
+                                                                the_dae.b,
+                                                                the_dae.c,
+                                                                noisy_X,
+                                                                X)
 
     if not simulate_only:
-        the_dae.W = the_dae.W - learning_rate * grad_W
-        the_dae.b = the_dae.b - learning_rate * grad_b
-        the_dae.c = the_dae.c - learning_rate * grad_c
+        the_dae.Wb = the_dae.Wb - learning_rate * grad_Wb
+        the_dae.Wc = the_dae.Wc - learning_rate * grad_Wc
+        the_dae.b  = the_dae.b  - learning_rate * grad_b
+        the_dae.c  = the_dae.c  - learning_rate * grad_c
 
-    return (grad_W, grad_b, grad_c)
+    return (grad_Wb, grad_Wc, grad_b, grad_c)
 
 
 def fit(the_dae, X, noisy_X, batch_size,
