@@ -96,7 +96,10 @@ mydae.set_params_to_best_noisy()
 import os
 
 # create a new directory to host the result files of this experiment
-output_directory = '/u/alaingui/umontreal/denoising_autoencoder/plots/experiment_%0.6d' % int(np.random.random() * 1.0e6)
+if os.getenv("DENOISING_REPO")=="":
+   print "Please define DENOISING_REPO environment variable"
+   quit()
+output_directory = os.getenv("DENOISING_REPO")+'/denoising_autoencoder/plots/experiment_%0.6d' % int(np.random.random() * 1.0e6)
 if not os.path.exists(output_directory):
     os.makedirs(output_directory)
 
