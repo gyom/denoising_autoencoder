@@ -190,11 +190,17 @@ def plot_reconstruction_function_minus_x_over_lambda(mydae, outputfile, n_bucket
 
     pylab.hold(True)
     p1 = pylab.plot(domain_values, (r_values - domain_values) / lambda_constant, c='#56ac0b', linewidth=3.0)
-    
+    p2 = pylab.plot(domain_values, np.zeros(domain_values.shape), c='#0a69a0', linestyle='--', linewidth=1.0)
+
+    # let's plot the original data points, when there's only a few of them
+    A = original_data.reshape((-1,))
+    if len(A) < 10:
+        p3 = pylab.plot(A, np.zeros(A.shape), c='#c5630c', linestyle='', marker='o', markersize=10)
+
     if not (comparison_dlogp == None):
         dlogp_values = comparison_dlogp(domain_values)
-        p2 = pylab.plot(domain_values, dlogp_values, c='#b00b3b', linewidth=2.0)
-        pylab.legend([p1,p2], ["(r(x)-x)/lambda", "dlogp(x)/dx"])
+        p4 = pylab.plot(domain_values, dlogp_values, c='#b00b3b', linewidth=2.0)
+        pylab.legend([p1,p4], ["(r(x)-x)/lambda", "dlogp(x)/dx"])
     else:
         pylab.legend([p1], ["(r(x)-x)/lambda"])
 
@@ -217,7 +223,7 @@ plot_reconstruction_function(mydae, os.path.join(output_directory, 'rx_versus_x_
 
 plot_reconstruction_function_minus_x_over_lambda(mydae, os.path.join(output_directory, 'rx_minus_x.png'),
                                                  n_buckets = 1000,
-                                                 domain_start = -3.0, domain_end = 3.0,
+                                                 domain_start = -1.5, domain_end = 1.5,
                                                  lambda_constant = train_noise_stddev)
 
 
