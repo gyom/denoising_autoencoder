@@ -5,9 +5,13 @@ np.random.seed(38734)
 
 import dae
 #dae = reload(dae)
-mydae = dae.DAE(n_inputs=2,
-                n_hiddens=500,
-                output_scaling_factor=2.0)
+n_inputs = 2
+n_hiddens = 500
+output_scaling_factor = 2.0
+
+mydae = dae.DAE(n_inputs = n_inputs,
+                n_hiddens = n_hiddens,
+                output_scaling_factor = output_scaling_factor)
 
 ## ----------------------
 ## Get the training data.
@@ -18,9 +22,9 @@ import debian_spiral
 # Now that we fix the training data, we have to insist
 # on the difference between original data and noisy replicated
 # versions of that original data.
-n_spiral_original_samples = 100
+n_spiral_original_samples = 1000
 spiral_samples_noise_stddev = 0.0
-angle_restriction = 0.3
+angle_restriction = 1.0
 original_data = debian_spiral.sample(n_spiral_original_samples, spiral_samples_noise_stddev,
                                      want_sorted_data = False, angle_restriction = angle_restriction)
 
@@ -46,7 +50,7 @@ batch_size = 100
 n_epochs = 10000
 
 
-method = 'fmin_cg'
+method = 'fmin_bfgs'
 #method = 'gradient_descent'
 #method = 'gradient_descent_multi_stage'
 
@@ -72,13 +76,16 @@ elif method == 'gradient_descent_multi_stage':
                                        learning_rate = learning_rate,
                                        verbose=True)
     mydae.set_params_to_best_noisy()
-elif method == 'fmin_cg':
+elif method == 'fmin_cg' or method == 'fmin_ncg' or method == 'fmin_bfgs':
     import dae_train_scipy_optimize
-    tolerance = 1.0e-3
+    optimization_args = {'method' : method,
+                         'gtol' : 1.0e-3,
+                         'maxiter' : 1000,
+                         'avextol' : 1.0e-4}
     dae_train_scipy_optimize.fit(mydae,
                                  X = clean_data,
                                  noisy_X = noisy_data,
-                                 tolerance = tolerance,
+                                 optimization_args = optimization_args,
                                  verbose=True)
     # No need to set the parameters of the dae
     # to the best recorded values. It should be
@@ -158,13 +165,13 @@ plot_training_loss_history(mydae, os.path.join(output_directory, 'absolute_losse
 ##                            ##
 ################################
 
-def plot_grid_reconstruction_grid(mydae, outputfile, plotgrid_N_buckets = 30, window_width = 0.3):
+def plot_grid_reconstruction_grid(mydae, outputfile, plotgrid_N_buckets = 30, window_width = 0.3, center = (0.0,0.0)):
 
-    (plotgrid_X, plotgrid_Y) = np.meshgrid(np.arange(- window_width,
-                                                     window_width,
+    (plotgrid_X, plotgrid_Y) = np.meshgrid(np.arange(center[0] - window_width,
+                                                     center[0] + window_width,
                                                      2 * window_width / plotgrid_N_buckets),
-                                           np.arange(- window_width,
-                                                     window_width,
+                                           np.arange(center[1] - window_width,
+                                                     center[1] + window_width,
                                                      2 * window_width / plotgrid_N_buckets))
     plotgrid = np.vstack([np.hstack(plotgrid_X), np.hstack(plotgrid_Y)]).T
 
@@ -197,7 +204,8 @@ def plot_grid_reconstruction_grid(mydae, outputfile, plotgrid_N_buckets = 30, wi
     pylab.draw()
     # pylab.axis([-0.6, 0.6, -0.6, 0.6])
     # pylab.axis([-0.3, 0.3, -0.3, 0.3])
-    pylab.axis([-window_width*1.0, window_width*1.0, -window_width*1.0, window_width*1.0])
+    pylab.axis([center[0] - window_width*1.0, center[0] + window_width*1.0,
+                center[1] - window_width*1.0, center[1] + window_width*1.0])
     pylab.savefig(outputfile, dpi=300)
     pylab.close()
 
@@ -212,6 +220,10 @@ plot_grid_reconstruction_grid(mydae, os.path.join(output_directory, 'spiral_reco
                               plotgrid_N_buckets = 30,
                               window_width = 0.3)
 
+plot_grid_reconstruction_grid(mydae, os.path.join(output_directory, 'spiral_reconstruction_grid_zoomed_close_manifold.png'),
+                              plotgrid_N_buckets = 30,
+                              window_width = 0.02, center = (0.02,-0.12))
+
 
 ###################################
 ##                               ##
@@ -223,8 +235,8 @@ plot_grid_reconstruction_grid(mydae, os.path.join(output_directory, 'spiral_reco
 html_file_path = os.path.join(output_directory, 'results.html')
 f = open(html_file_path, "w")
 
-if method == 'fmin_cg':
-    hyperparams_contents_for_method = ""
+if method == 'fmin_cg' or method == 'fmin_ncg' or method == 'fmin_bfgs':
+    hyperparams_contents_for_method = str(optimization_args)
 elif (method == 'gradient_descent' or
       method == 'gradient_descent_multi_stage'):
     hyperparams_contents_for_method = """
@@ -290,6 +302,7 @@ contents = """
 <div class='listing'>
     <img src='spiral_reconstruction_grid_full.png' width='600px'/>
     <img src='spiral_reconstruction_grid_zoomed_center.png' width='600px'/>
+    <img src='spiral_reconstruction_grid_zoomed_close_manifold.png' width='600px'/>
 </div>
 
 </body>
@@ -300,3 +313,22 @@ f.write(contents)
 f.close()
 
 
+
+##################################
+#
+# Pickle the parameters for reuse.
+#
+##################################
+
+import cPickle
+pickled_results_file = os.path.join(output_directory, 'results.pkl')
+cPickle.dump({'Wb' : mydae.Wb,
+              'Wc' : mydae.Wc,
+              'b' : mydae.b,
+              'c' : mydae.c,
+              'optimization_args' : optimization_args,
+              'n_inputs' : n_inputs,
+              'n_hiddens' : n_hiddens,
+              'output_scaling_factor' : output_scaling_factor,
+              'train_noise_stddev' : train_noise_stddev},
+             open(pickled_results_file, "w"))

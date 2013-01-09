@@ -36,7 +36,7 @@ def read_params_from_q(q, n_inputs, n_hiddens):
 
 def fit(the_dae,
         X, noisy_X,
-        tolerance = 1.0e-6,
+        optimization_args,
         verbose=False):
     """
     Fit the model to the data X.
@@ -91,7 +91,7 @@ def fit(the_dae,
             # into the DAE in order to perform the logging because we
             # make a call to its internal function that keeps track of the loss.
             (the_dae.Wb, the_dae.Wc, the_dae.b, the_dae.c) = read_params_from_q(current_q, the_dae.n_inputs, the_dae.n_hiddens)
-            if verbose and (callback_counter % 100 == 0):
+            if verbose and (callback_counter % 1 == 0):
                 sys.stdout.flush()
                 print "Epoch %d of some scipy.optimize minimizer algorithm." % callback_counter
                 the_dae.perform_logging(X, noisy_X = noisy_X, verbose = True)
@@ -102,6 +102,22 @@ def fit(the_dae,
         callback_counter = callback_counter + 1
 
     # With everything set up, perform the optimization.
-    best_q = scipy.optimize.fmin_cg(f, q0, fprime, callback = loggin_callback, gtol = tolerance)
+    if optimization_args['method'] == 'fmin_cg':
+        best_q = scipy.optimize.fmin_cg(f, q0, fprime,
+                                        callback = loggin_callback,
+                                        gtol = optimization_args['gtol'],
+                                        maxiter = optimization_args['maxiter'])
+    elif optimization_args['method'] == 'fmin_ncg':
+        best_q = scipy.optimize.fmin_ncg(f, q0, fprime,
+                                         callback = loggin_callback,
+                                         avextol = optimization_args['avextol'],
+                                         maxiter = optimization_args['maxiter'])
+    elif optimization_args['method'] == 'fmin_bfgs':
+        best_q = scipy.optimize.fmin_bfgs(f, q0, fprime,
+                                          callback = loggin_callback,
+                                          maxiter = optimization_args['maxiter'])
+    else:
+        error("Unrecognized method name : " + optimization_args['method'])
+
     # Write back the best solution into the DAE.
     (the_dae.Wb, the_dae.Wc, the_dae.b, the_dae.c) = read_params_from_q(best_q, the_dae.n_inputs, the_dae.n_hiddens)
