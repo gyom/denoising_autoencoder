@@ -74,7 +74,7 @@ elif method == 'gradient_descent_multi_stage':
     mydae.set_params_to_best_noisy()
 elif method == 'fmin_cg':
     import dae_train_scipy_optimize
-    tolerance = 1.0e-4
+    tolerance = 1.0e-3
     dae_train_scipy_optimize.fit(mydae,
                                  X = clean_data,
                                  noisy_X = noisy_data,
