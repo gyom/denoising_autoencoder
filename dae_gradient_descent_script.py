@@ -46,7 +46,8 @@ batch_size = 100
 n_epochs = 10000
 
 
-method = 'gradient_descent'
+method = 'fmin_cg'
+#method = 'gradient_descent'
 #method = 'gradient_descent_multi_stage'
 
 if method == 'gradient_descent':
@@ -59,6 +60,7 @@ if method == 'gradient_descent':
                                    n_epochs = n_epochs,
                                    learning_rate = learning_rate,
                                    verbose=True)
+    mydae.set_params_to_best_noisy()
 elif method == 'gradient_descent_multi_stage':
     import dae_train_gradient_descent
     for learning_rate in [1.0e-3, 1.0e-4, 1.0e-6]:
@@ -69,24 +71,21 @@ elif method == 'gradient_descent_multi_stage':
                                        n_epochs = n_epochs,
                                        learning_rate = learning_rate,
                                        verbose=True)
-elif method == 'hmc':
-    error("The HMC part of the code is now essentially rotten and has to be revisited to be revived.")
-    #import dae_train_hmc
-    #L = 100
-    #epsilon = 0.01
-    #dae_train_hmc.fit(mydae,
-    #                  X = clean_data,
-    #                  noisy_X = noisy_data,
-    #                  batch_size = batch_size,
-    #                  n_epochs = n_epochs,
-    #                  L, epsilon,
-    #                  verbose=True)
+    mydae.set_params_to_best_noisy()
+elif method == 'fmin_cg':
+    import dae_train_scipy_optimize
+    tolerance = 1.0e-4
+    dae_train_scipy_optimize.fit(mydae,
+                                 X = clean_data,
+                                 noisy_X = noisy_data,
+                                 tolerance = tolerance,
+                                 verbose=True)
+    # No need to set the parameters of the dae
+    # to the best recorded values. It should be
+    # handled by the scipy.optimize subfunction.
 else:
     error("Unrecognized training method.")
 
-
-mydae.set_params_to_best_noisy()
-# mydae.set_params_to_best_noiseless()
 
 
 ## --------------------------------------
@@ -224,12 +223,10 @@ plot_grid_reconstruction_grid(mydae, os.path.join(output_directory, 'spiral_reco
 html_file_path = os.path.join(output_directory, 'results.html')
 f = open(html_file_path, "w")
 
-if method == 'hmc':
-    hyperparams_contents_for_method = """
-    <p>frogleap jumps  : %d</p>
-    <p>epsilon : %f</p>
-    """ % (L, epsilon)
-elif method == 'gradient_descent' or method == 'gradient_descent_multi_stage':
+if method == 'fmin_cg':
+    hyperparams_contents_for_method = ""
+elif (method == 'gradient_descent' or
+      method == 'gradient_descent_multi_stage'):
     hyperparams_contents_for_method = """
     <p>learning rate  : %f</p>
     """ % (learning_rate,)

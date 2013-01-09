@@ -264,7 +264,7 @@ class DAE(object):
             #print "    Loss : %0.6f" % self.logging['noiseless']['mean_abs_loss'][-1]
             #print "    Activations Mean Abs. Hidden = %0.6f, Reconstructed = %0.6f" % (abs_act, abs_ract)
             #print "  -- Noise --"
-            print "    Loss : %0.6f" % self.logging['noisy']['mean_abs_loss'][-1]
+            print "    Loss : %0.10f" % self.logging['noisy']['mean_abs_loss'][-1]
             #print "    Activations Mean Abs. Hidden = %0.6f, Reconstructed = %0.6f" % (noise_abs_act, noise_abs_ract)
             #print "  Gradient W Mean Abs = %f" % numpy.abs(self.grad_W).mean()
             #print "\n"
