@@ -32,7 +32,7 @@ original_data = debian_spiral.sample(n_spiral_original_samples, spiral_samples_n
 replication_factor = 10
 n_spiral_replicated_samples = n_spiral_original_samples * replication_factor
 
-train_noise_stddev = 0.01
+train_noise_stddev = 0.1
 clean_data = np.tile(original_data, (replication_factor, 1))
 np.random.shuffle(clean_data)
 noisy_data = clean_data + np.random.normal(size = clean_data.shape,

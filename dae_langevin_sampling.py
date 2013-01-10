@@ -18,6 +18,18 @@ def get_starting_point_for_spiral():
     return spiral_samples[0,:]
 
 
+def plot_spiral_into_axes(axes):
+    from matplotlib.lines import Line2D
+    import debian_spiral
+    N = 80
+    spiral_samples = debian_spiral.sample(N, 0.0, want_sorted_data = True, want_evenly_spaced = True)
+    for i in range(N-1):
+        l = Line2D([spiral_samples[i,0],spiral_samples[i+1,0]],
+                   [spiral_samples[i,1],spiral_samples[i+1,1]],
+                   linestyle='--', linewidth=1.0, c='#f9a21d')
+        axes.add_line(l)
+
+
 def run_langevin_simulation(mydae, simulated_samples, noise_stddev, n_iter, n_sub_iter):
 
     # The noise_stddev should be something like
@@ -42,18 +54,21 @@ def run_langevin_simulation(mydae, simulated_samples, noise_stddev, n_iter, n_su
     return logged_simulated_samples
 
 
-def write_simulated_samples_frames(logged_simulated_samples, filename_generator_function):
+def write_simulated_samples_frames(logged_simulated_samples, filename_generator_function, window_width=1.0, center=(0.0, 0.0)):
 
     for i in range(logged_simulated_samples.shape[0]):
 
         outputfile = filename_generator_function(i)
 
         pylab.hold(True)
+        plot_spiral_into_axes(pylab.gca())
         pylab.scatter(logged_simulated_samples[i,:,0],
                       logged_simulated_samples[i,:,1],
                       c='#c20aab')
+        pylab.axis([center[0] - window_width*1.0, center[0] + window_width*1.0,
+                    center[1] - window_width*1.0, center[1] + window_width*1.0])
         pylab.draw()
-        pylab.savefig(outputfile, dpi=300)
+        pylab.savefig(outputfile, dpi=100)
         pylab.close()
         print("Wrote " + outputfile)
 
