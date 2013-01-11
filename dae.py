@@ -9,7 +9,7 @@ Guillaume Alain.
 import sys
 import os
 import pdb
-import numpy
+import numpy as np
 
 from theano import *
 import theano.tensor as T
@@ -138,8 +138,68 @@ class DAE(object):
                                          [T.grad(sum_loss, Wb), T.grad(sum_loss, Wc),
                                           T.grad(sum_loss, b),  T.grad(sum_loss, c)])
 
+        # other useful theano functions for the experiments that involve
+        # adding noise to the hidden states
+        self.theano_encode = function([Wc,c,x], h)
+        self.theano_decode = function([Wb,b,h], r)
+
+        # A non-vectorial implementation of the jacobian
+        # of the encoder. Meant to be used with only one x
+        # at a time, returning a matrix.
+        jacob_x = T.dvector('jacob_x')
+        jacob_c = T.dvector('jacob_c')
+        jacob_Wc = T.dmatrix('jacob_Wc')
+        jacob_s = T.dot(jacob_x, jacob_Wc) + jacob_c
+        jacob_h = T.tanh(jacob_s)
+        self.theano_encoder_jacobian_single = function([jacob_Wc,jacob_c,jacob_x], gradient.jacobian(jacob_h,jacob_x,consider_constant=[jacob_Wc,jacob_c]))
+
+
+
+    def encode(self, X):
+        if X.shape[1] != self.n_inputs:
+            error("Using wrong shape[1] for the argument X to DAE.encode. It's %d when it should be %d" % (X.shape[1], self.n_inputs))
+        return self.theano_encode(self.Wc, self.c, X)
+
+    def decode(self, H):
+        if H.shape[1] != self.n_hiddens:
+            error("Using wrong shape[1] for the argument H to DAE.decode. It's %d when it should be %d" % (H.shape[1], self.n_hiddens))
+        return self.theano_decode(self.Wb, self.b, H)
+
     def encode_decode(self, X):
+        if X.shape[1] != self.n_inputs:
+            error("Using wrong shape[1] for the argument X to DAE.encode_decode. It's %d when it should be %d" % (X.shape[1], self.n_inputs))
         return self.theano_encode_decode(self.Wb, self.Wc, self.b, self.c, X)
+
+    def encoder_jacobian(self, X):
+
+        error("This function appears to be broken. I don't know why, but just don't use it.")
+
+        # We are exploiting the fact that, for a single x we have
+        #
+        # $\frac{\partial h}{\partial x}=\textrm{diag}\left(1-tanh^{2}(xW_{c}+c)\right)W_{c}^{T}$
+        #
+        # which means that we have to compute
+        #   the hidden units H of shape (N, n_hiddens), reshaped as (N, n_hiddens, 1)
+        #   the matrix Wc of shape (n_hiddens, n_inputs), reshape as (1, n_hiddens, n_inputs)
+        #
+        # which we then combine by broadcasting along the new dimensions.
+
+        #N = X.shape[0]
+        #
+        #H = self.encode(X).reshape((N,self.n_hiddens,1))
+        #WT = self.Wc.T.reshape((1,self.n_hiddens,self.n_inputs))
+        #
+        #return np.tile(1- H**2, (1,1,self.n_inputs)) * np.tile(WT, (N,1,1))
+
+    def encoder_jacobian_single(self, x):
+
+        if len(x.shape) == 2 and x.shape[1] == self.n_inputs:
+            return self.theano_encoder_jacobian_single(self.Wc, self.c, x.reshape((-1,)))
+        elif len(x.shape) == 1 and x.shape[0] == self.n_inputs:
+            return self.theano_encoder_jacobian_single(self.Wc, self.c, x)
+        else:
+            error("You are misusing the sanity check function encoder_jacobian_sanity by giving an argument x of wrong shape.")
+
 
     def model_loss(self, X, noisy_X = None, noise_stddev = 0.0):
         """
@@ -159,7 +219,7 @@ class DAE(object):
 
         if noisy_X == None:
             if noise_stddev > 0.0:
-                noisy_X = X + numpy.random.normal(scale = noise_stddev, size = X.shape)
+                noisy_X = X + np.random.normal(scale = noise_stddev, size = X.shape)
             else:
                 noisy_X = X
         
@@ -167,16 +227,16 @@ class DAE(object):
 
 
     def reset_params(self):
-        self.Wb = numpy.random.uniform( low = -1.0, high = 1.0, size=(self.n_inputs, self.n_hiddens) )
-        self.Wc = numpy.random.uniform( low = -1.0, high = 1.0, size=(self.n_inputs, self.n_hiddens) )
-        #self.W = numpy.random.uniform(
-        #    low = - 4.0 * numpy.sqrt(6./(self.n_inputs + self.n_hiddens)),
-        #    high = 4.0 * numpy.sqrt(6./(self.n_inputs + self.n_hiddens)),
+        self.Wb = np.random.uniform( low = -1.0, high = 1.0, size=(self.n_inputs, self.n_hiddens) )
+        self.Wc = np.random.uniform( low = -1.0, high = 1.0, size=(self.n_inputs, self.n_hiddens) )
+        #self.W = np.random.uniform(
+        #    low = - 4.0 * np.sqrt(6./(self.n_inputs + self.n_hiddens)),
+        #    high = 4.0 * np.sqrt(6./(self.n_inputs + self.n_hiddens)),
         #    size=(d, self.n_hiddens))
-        self.b = numpy.random.uniform( low = -0.1, high = 0.1, size=(self.n_inputs,) )
-        self.c = numpy.random.uniform( low = -0.1, high = 0.1, size=(self.n_hiddens,) )
-        #self.b = numpy.zeros(self.n_inputs)
-        #self.c = numpy.zeros(self.n_hiddens)
+        self.b = np.random.uniform( low = -0.1, high = 0.1, size=(self.n_inputs,) )
+        self.c = np.random.uniform( low = -0.1, high = 0.1, size=(self.n_hiddens,) )
+        #self.b = np.zeros(self.n_inputs)
+        #self.c = np.zeros(self.n_hiddens)
 
     def set_params_to_best_noisy(self):
         self.Wb = self.best_noisy_params['Wb']
@@ -207,8 +267,8 @@ class DAE(object):
         else:
             noisy_all_losses, noisy_all_abs_act, noisy_all_abs_ract = self.model_loss(X, noise_stddev = noise_stddev)
 
-        self.logging['noisy']['mean_abs_loss'].append( numpy.abs(noisy_all_losses).mean() )
-        self.logging['noisy']['var_abs_loss'].append( numpy.abs(noisy_all_losses).var() )
+        self.logging['noisy']['mean_abs_loss'].append( np.abs(noisy_all_losses).mean() )
+        self.logging['noisy']['var_abs_loss'].append( np.abs(noisy_all_losses).var() )
 
         self.logging['noisy']['mean_abs_act'].append( noisy_all_abs_act.mean() )
         self.logging['noisy']['var_abs_act'].append( noisy_all_abs_act.var() )
@@ -218,8 +278,8 @@ class DAE(object):
 
         #if not (X == None):
         #    grad_W, grad_b, grad_c = self.one_step_grad_descent(X, perform_update = False)
-        #    self.logging['noisy']['mean_abs_grad_W'].append( numpy.abs(grad_W).mean() )
-        #    self.logging['noisy']['var_abs_grad_W'].append( numpy.abs(grad_W).var() )
+        #    self.logging['noisy']['mean_abs_grad_W'].append( np.abs(grad_W).mean() )
+        #    self.logging['noisy']['var_abs_grad_W'].append( np.abs(grad_W).var() )
 
         # if there is no key, or if we're beating the current best, replace the value
         if ((not self.best_noisy_params.has_key('loss')) or
@@ -234,8 +294,8 @@ class DAE(object):
         # 'noiseless'
         noiseless_all_losses, noiseless_all_abs_act, noiseless_all_abs_ract = self.model_loss(X, noisy_X = X)
 
-        self.logging['noiseless']['mean_abs_loss'].append( numpy.abs(noiseless_all_losses).mean() )
-        self.logging['noiseless']['var_abs_loss'].append( numpy.abs(noiseless_all_losses).var() )
+        self.logging['noiseless']['mean_abs_loss'].append( np.abs(noiseless_all_losses).mean() )
+        self.logging['noiseless']['var_abs_loss'].append( np.abs(noiseless_all_losses).var() )
 
         self.logging['noiseless']['mean_abs_act'].append( noiseless_all_abs_act.mean() )
         self.logging['noiseless']['var_abs_act'].append(  noiseless_all_abs_act.var() )
@@ -245,8 +305,8 @@ class DAE(object):
 
         #if not (X == None):
         #    grad_W, grad_b, grad_c = self.one_step_grad_descent(X, perform_update = False, jacobi_penalty_override = 0.0)
-        #    self.logging['noiseless']['mean_abs_grad_W'].append( numpy.abs(grad_W).mean() )
-        #    self.logging['noiseless']['var_abs_grad_W'].append( numpy.abs(grad_W).var() )
+        #    self.logging['noiseless']['mean_abs_grad_W'].append( np.abs(grad_W).mean() )
+        #    self.logging['noiseless']['var_abs_grad_W'].append( np.abs(grad_W).var() )
 
         # if there is no key, or if we're beating the current best, replace the value
         if ((not self.best_noiseless_params.has_key('loss')) or
@@ -266,7 +326,7 @@ class DAE(object):
             #print "  -- Noise --"
             print "    Loss : %0.10f" % self.logging['noisy']['mean_abs_loss'][-1]
             #print "    Activations Mean Abs. Hidden = %0.6f, Reconstructed = %0.6f" % (noise_abs_act, noise_abs_ract)
-            #print "  Gradient W Mean Abs = %f" % numpy.abs(self.grad_W).mean()
+            #print "  Gradient W Mean Abs = %f" % np.abs(self.grad_W).mean()
             #print "\n"
 
 

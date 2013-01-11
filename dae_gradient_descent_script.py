@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import numpy as np
-np.random.seed(38734)
+#np.random.seed(38730)
 
 import dae
 #dae = reload(dae)
@@ -32,11 +32,19 @@ original_data = debian_spiral.sample(n_spiral_original_samples, spiral_samples_n
 replication_factor = 10
 n_spiral_replicated_samples = n_spiral_original_samples * replication_factor
 
-train_noise_stddev = 0.1
+train_noise_stddev = 0.01
 clean_data = np.tile(original_data, (replication_factor, 1))
 np.random.shuffle(clean_data)
 noisy_data = clean_data + np.random.normal(size = clean_data.shape,
                                            scale = train_noise_stddev)
+
+# 5% of the values will have noise 10 times as larger applied to them
+want_rare_large_noise = True
+if want_rare_large_noise:
+    larger_noise = np.random.normal(size = clean_data.shape,
+                                    scale = train_noise_stddev*10)
+    larger_noise[np.where(np.random.uniform(0, 1, size=larger_noise.shape[0]) < 0.95), :] = 0.0
+    noisy_data = noisy_data + larger_noise
 
 if clean_data.shape != (n_spiral_replicated_samples, 2):
     error("Wrong shape for the data.")
@@ -220,6 +228,11 @@ plot_grid_reconstruction_grid(mydae, os.path.join(output_directory, 'spiral_reco
                               plotgrid_N_buckets = 30,
                               window_width = 0.3)
 
+plot_grid_reconstruction_grid(mydae, os.path.join(output_directory, 'spiral_reconstruction_grid_half.png'),
+                              plotgrid_N_buckets = 30,
+                              window_width = 0.5)
+
+
 plot_grid_reconstruction_grid(mydae, os.path.join(output_directory, 'spiral_reconstruction_grid_zoomed_close_manifold.png'),
                               plotgrid_N_buckets = 30,
                               window_width = 0.02, center = (0.02,-0.12))
@@ -303,6 +316,7 @@ contents = """
     <img src='spiral_reconstruction_grid_full.png' width='600px'/>
     <img src='spiral_reconstruction_grid_zoomed_center.png' width='600px'/>
     <img src='spiral_reconstruction_grid_zoomed_close_manifold.png' width='600px'/>
+    <img src='spiral_reconstruction_grid_half.png' width='600px'/>
 </div>
 
 </body>

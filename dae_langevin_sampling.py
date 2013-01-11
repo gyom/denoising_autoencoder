@@ -30,7 +30,7 @@ def plot_spiral_into_axes(axes):
         axes.add_line(l)
 
 
-def run_langevin_simulation(mydae, simulated_samples, noise_stddev, n_iter, n_sub_iter):
+def run_langevin_simulation(mydae, simulated_samples, noise_stddev, n_iter, n_sub_iter, noise_method = 'iso_x'):
 
     # The noise_stddev should be something like
     #
@@ -39,17 +39,47 @@ def run_langevin_simulation(mydae, simulated_samples, noise_stddev, n_iter, n_su
     # according to what I read from the most recent
     # copy of our paper that I can find lying around my desk.
 
+    # Acceptable values for noise_method include:
+    # 'iso_x', 'JTJ_h', 'iso_h'
+
     logged_simulated_samples = np.zeros((n_iter, simulated_samples.shape[0], simulated_samples.shape[1]))
 
     for i in range(n_iter):
         logged_simulated_samples[i,:,:] = simulated_samples
         print("iteration %d done" % i)
         for _ in range(n_sub_iter):
-            # isotropic noise added to every sample
-            simulated_samples = simulated_samples + np.random.normal(scale = noise_stddev, size = simulated_samples.shape)
-            # encode_decode is conveniently constructed as a vectored
-            # function along the 0-th dimension
-            simulated_samples = mydae.encode_decode(simulated_samples)
+
+            if noise_method == 'iso_x':
+                # isotropic noise added to every sample
+                simulated_samples = simulated_samples + np.random.normal(scale = noise_stddev, size = simulated_samples.shape)
+                # encode_decode is conveniently constructed as a vectored
+                # function along the 0-th dimension
+                simulated_samples = mydae.encode_decode(simulated_samples)
+            elif noise_method == 'iso_h':
+                simulated_samples_h = mydae.encode(simulated_samples)
+                simulated_samples_h = simulated_samples_h + np.random.normal(scale = noise_stddev, size = simulated_samples_h.shape)
+                simulated_samples = mydae.decode(simulated_samples_h)
+            elif noise_method == 'JTJ_h':
+                # unfortunately, we don't have a vectorized version of this code for the jacobian of the encoder
+                simulated_samples_h = mydae.encode(simulated_samples)
+                for k in range(simulated_samples_h.shape[0]):
+                    # Compute the jacobian J, draw from a normal, matrix-multiply by J
+                    # and that gets you a normal drawn from covariance J^TJ.
+                    # We still have the noise_stddev in there even though we're
+                    # no longer totally sure where it should really be.
+                    J = mydae.encoder_jacobian_single(simulated_samples[k,:])
+                    # print J.shape
+                    # print simulated_samples.shape
+                    #
+                    # So it's J multiplying normal noise in the space of dimension of X ?
+                    e = J.dot(np.random.normal(scale = noise_stddev, size = (simulated_samples.shape[1],1)))
+                    # print e.shape
+                    simulated_samples_h[k,:] = simulated_samples_h[k,:] + e.reshape((-1,))
+
+
+                simulated_samples = mydae.decode(simulated_samples_h)
+            else:
+                error('noise_method not recognized : ' + noise_method)
 
     return logged_simulated_samples
 
@@ -109,12 +139,13 @@ def main():
     n_simulated_samples = 100
     simulated_samples = np.tile(get_starting_point_for_spiral().reshape((1,-1)), (n_simulated_samples, 1))
 
-    n_iter = 1000
-    n_sub_iter = 1000
-    logged_simulated_samples = run_langevin_simulation(mydae, simulated_samples, train_noise_stddev * 1.414, n_iter, n_sub_iter)
+    n_iter = 100
+    n_sub_iter = 100
+    logged_simulated_samples = run_langevin_simulation(mydae, simulated_samples, train_noise_stddev * 1.414, n_iter, n_sub_iter, noise_method='JTJ_h')
 
     write_simulated_samples_frames(logged_simulated_samples,
-                                   lambda i: os.path.join(simulated_frames_output_dir, "simulation_frame_%0.5d" % i))
+                                   lambda i: os.path.join(simulated_frames_output_dir, "simulation_frame_%0.5d" % i),
+                                   window_width=1.0)
 
 
 
@@ -125,3 +156,5 @@ if __name__ == "__main__":
 
 
 #  python dae_langevin_sampling.py $HOME/umontreal/denoising_autoencoder/plots/experiment_970584/results.pkl $HOME/Documents/tmp/1
+
+# ffmpeg -i /u/alaingui/Documents/tmp/4/simulation_frame_%05d.png -vcodec mpeg4 /u/alaingui/Documents/tmp/4/sequence.avi
