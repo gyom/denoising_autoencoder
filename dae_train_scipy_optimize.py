@@ -84,7 +84,7 @@ def fit(the_dae,
     global callback_counter
     callback_counter = 0
 
-    def loggin_callback(current_q):
+    def logging_callback(current_q):
         global callback_counter
         if the_dae.want_logging:
             # It's kinda funny that we need to write the parameters
@@ -104,18 +104,23 @@ def fit(the_dae,
     # With everything set up, perform the optimization.
     if optimization_args['method'] == 'fmin_cg':
         best_q = scipy.optimize.fmin_cg(f, q0, fprime,
-                                        callback = loggin_callback,
+                                        callback = logging_callback,
                                         gtol = optimization_args['gtol'],
                                         maxiter = optimization_args['maxiter'])
     elif optimization_args['method'] == 'fmin_ncg':
         best_q = scipy.optimize.fmin_ncg(f, q0, fprime,
-                                         callback = loggin_callback,
+                                         callback = logging_callback,
                                          avextol = optimization_args['avextol'],
                                          maxiter = optimization_args['maxiter'])
     elif optimization_args['method'] == 'fmin_bfgs':
         best_q = scipy.optimize.fmin_bfgs(f, q0, fprime,
-                                          callback = loggin_callback,
+                                          callback = logging_callback,
                                           maxiter = optimization_args['maxiter'])
+    #elif optimization_args['method'] == 'fmin_l_bfgs_b':
+    #    # Cannot perform the logging.
+    #    best_q = scipy.optimize.fmin_l_bfgs_b(f, q0, fprime,
+    #                                          # m = optimization_args['m'],
+    #                                          maxfun = optimization_args['maxiter'])
     else:
         error("Unrecognized method name : " + optimization_args['method'])
 

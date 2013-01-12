@@ -141,17 +141,60 @@ def main():
 
     n_iter = 100
     n_sub_iter = 100
+
+    # should check if we have to multiply by sqrt(2)=1.414
+
     logged_simulated_samples = run_langevin_simulation(mydae, simulated_samples, train_noise_stddev * 1.414, n_iter, n_sub_iter, noise_method='JTJ_h')
 
     write_simulated_samples_frames(logged_simulated_samples,
-                                   lambda i: os.path.join(simulated_frames_output_dir, "simulation_frame_%0.5d" % i),
+                                   lambda i: os.path.join(simulated_frames_output_dir, "simulation_frame_%0.5d.png" % i),
                                    window_width=1.0)
 
+    # Save the results for future use.
+    cPickle.dump(logged_simulated_samples, open(os.path.join(simulated_frames_output_dir, "logged_simulated_samples.pkl"), "w"))
 
+    # Now we'll generate a collection of possibly useful plots for the ICLR paper.
+    # Maybe it would be better to skip the first half of the points, but
+    # in practice things stabilize rather fast so it might not be necessary.
+
+    #combined_logged_simulated_samples = np.vcat([logged_simulated_samples[i,j,:].reshape((1,-1))
+    #                                             for i in range logged_simulated_samples.shape[0]
+    #                                             for j in range logged_simulated_samples.shape[1]])
+
+    combined_logged_simulated_samples = logged_simulated_samples.reshape((1,-1,logged_simulated_samples.shape[2]))
+    write_simulated_samples_frames(combined_logged_simulated_samples,
+                                   lambda i: os.path.join(simulated_frames_output_dir, "all_frames_width_0.5.png"),
+                                   window_width=0.5)
+    write_simulated_samples_frames(combined_logged_simulated_samples,
+                                   lambda i: os.path.join(simulated_frames_output_dir, "all_frames_width_1.0.png"),
+                                   window_width=1.0)
+    write_simulated_samples_frames(combined_logged_simulated_samples,
+                                   lambda i: os.path.join(simulated_frames_output_dir, "all_frames_width_2.0.png"),
+                                   window_width=2.0)
 
 
 if __name__ == "__main__":
     main()
+
+
+
+
+def plot_reference_spiral_for_ICLR_paper(simulated_frames_output_dir, n_simulated_samples, n_iter):
+    # Plot the reference graph for the ICLR paper.
+    import debian_spiral
+    original_spiral_samples = debian_spiral.sample(n_simulated_samples * n_iter, 0.0).reshape((1,-1,2))
+    write_simulated_samples_frames(original_spiral_samples,
+                                   lambda i: os.path.join(simulated_frames_output_dir, "original_spiral_samples_width_0.5.png"),
+                                   window_width=0.5)
+    write_simulated_samples_frames(original_spiral_samples,
+                                   lambda i: os.path.join(simulated_frames_output_dir, "original_spiral_samples_width_1.0.png"),
+                                   window_width=1.0)
+    write_simulated_samples_frames(original_spiral_samples,
+                                   lambda i: os.path.join(simulated_frames_output_dir, "original_spiral_samples_width_2.0.png"),
+                                   window_width=2.0)
+
+
+# plot_reference_spiral_for_ICLR_paper("/u/alaingui/Documents/tmp/14", 100, 100)
 
 
 

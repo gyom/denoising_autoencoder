@@ -1,12 +1,27 @@
 #!/usr/bin/env python
 
+
+import sys
+
+# Having an option to read some parameters as json fed
+# as argument.
+if len(sys.argv) > 1:
+    import json
+    override_params = json.loads(sys.argv[1])
+
+
+
 import numpy as np
 #np.random.seed(38730)
 
 import dae
 #dae = reload(dae)
 n_inputs = 2
-n_hiddens = 500
+
+if 'n_hiddens' not in override_params.keys():
+    n_hiddens = 500
+else:
+    n_hiddens = override_params['n_hiddens']
 output_scaling_factor = 2.0
 
 mydae = dae.DAE(n_inputs = n_inputs,
@@ -23,7 +38,10 @@ import debian_spiral
 # on the difference between original data and noisy replicated
 # versions of that original data.
 n_spiral_original_samples = 1000
-spiral_samples_noise_stddev = 0.0
+if 'spiral_samples_noise_stddev' not in override_params.keys():
+    spiral_samples_noise_stddev = 0.0
+else:
+    spiral_samples_noise_stddev = override_params['spiral_samples_noise_stddev']
 angle_restriction = 1.0
 original_data = debian_spiral.sample(n_spiral_original_samples, spiral_samples_noise_stddev,
                                      want_sorted_data = False, angle_restriction = angle_restriction)
@@ -32,14 +50,20 @@ original_data = debian_spiral.sample(n_spiral_original_samples, spiral_samples_n
 replication_factor = 10
 n_spiral_replicated_samples = n_spiral_original_samples * replication_factor
 
-train_noise_stddev = 0.01
+if 'train_noise_stddev' not in override_params.keys():
+    train_noise_stddev = 0.01
+else:
+    train_noise_stddev = override_params['train_noise_stddev']
 clean_data = np.tile(original_data, (replication_factor, 1))
 np.random.shuffle(clean_data)
 noisy_data = clean_data + np.random.normal(size = clean_data.shape,
                                            scale = train_noise_stddev)
 
 # 5% of the values will have noise 10 times as larger applied to them
-want_rare_large_noise = True
+if 'want_rare_large_noise' not in override_params.keys():
+    want_rare_large_noise = False
+else:
+    want_rare_large_noise = override_params['want_rare_large_noise']
 if want_rare_large_noise:
     larger_noise = np.random.normal(size = clean_data.shape,
                                     scale = train_noise_stddev*10)
@@ -59,6 +83,7 @@ n_epochs = 10000
 
 
 method = 'fmin_bfgs'
+#method = 'fmin_l_bfgs_b'    not working
 #method = 'gradient_descent'
 #method = 'gradient_descent_multi_stage'
 
@@ -84,7 +109,10 @@ elif method == 'gradient_descent_multi_stage':
                                        learning_rate = learning_rate,
                                        verbose=True)
     mydae.set_params_to_best_noisy()
-elif method == 'fmin_cg' or method == 'fmin_ncg' or method == 'fmin_bfgs':
+elif (method == 'fmin_cg' or
+      method == 'fmin_ncg' or 
+      method == 'fmin_bfgs'):
+    #method == 'fmin_l_bfgs_b'):
     import dae_train_scipy_optimize
     optimization_args = {'method' : method,
                          'gtol' : 1.0e-3,
@@ -114,8 +142,8 @@ else:
 # directory.
 
 import os
-import time
-np.random.seed(int(time.time()))
+# import time
+# np.random.seed(int(time.time()))
 
 if os.getenv("DENOISING_REPO")=="":
    print "Please define DENOISING_REPO environment variable"
@@ -272,6 +300,7 @@ hyperparams_contents = """
 
 <p>dataset noise : %0.6f</p>
 <p>angle restriction : %0.6f</p>
+<p>want rare large noise : %s</p>
 """ % (mydae.n_inputs,
        mydae.n_hiddens,
        batch_size,
@@ -281,7 +310,8 @@ hyperparams_contents = """
        n_spiral_original_samples,
        n_spiral_replicated_samples,
        spiral_samples_noise_stddev,
-       angle_restriction)
+       angle_restriction,
+       str(want_rare_large_noise))
 
 params_contents = ""
 
@@ -325,8 +355,7 @@ contents = """
 
 f.write(contents)
 f.close()
-
-
+print("Wrote " + html_file_path)
 
 ##################################
 #
@@ -336,6 +365,7 @@ f.close()
 
 import cPickle
 pickled_results_file = os.path.join(output_directory, 'results.pkl')
+f = open(pickled_results_file, "w")
 cPickle.dump({'Wb' : mydae.Wb,
               'Wc' : mydae.Wc,
               'b' : mydae.b,
@@ -345,4 +375,6 @@ cPickle.dump({'Wb' : mydae.Wb,
               'n_hiddens' : n_hiddens,
               'output_scaling_factor' : output_scaling_factor,
               'train_noise_stddev' : train_noise_stddev},
-             open(pickled_results_file, "w"))
+             f)
+f.close()
+print("Wrote " + pickled_results_file)
