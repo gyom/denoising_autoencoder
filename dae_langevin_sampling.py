@@ -30,7 +30,9 @@ def plot_spiral_into_axes(axes):
         axes.add_line(l)
 
 
-def run_langevin_simulation(mydae, simulated_samples, noise_stddev, n_iter, n_sub_iter, noise_method = 'iso_x'):
+def run_langevin_simulation(mydae, simulated_samples_x,
+                            train_noise_stddev, langevin_noise_stddev,
+                            n_iter, n_sub_iter, noise_method = 'iso_x'):
 
     # The noise_stddev should be something like
     #
@@ -40,48 +42,89 @@ def run_langevin_simulation(mydae, simulated_samples, noise_stddev, n_iter, n_su
     # copy of our paper that I can find lying around my desk.
 
     # Acceptable values for noise_method include:
-    # 'iso_x', 'JTJ_h', 'iso_h'
+    # 'iso_x', 'JJT_h', 'iso_h'
 
-    logged_simulated_samples = np.zeros((n_iter, simulated_samples.shape[0], simulated_samples.shape[1]))
+    if (noise_method in ['iso_x', 'iso_h']
+        and langevin_noise_stddev != train_noise_stddev * np.sqrt(2)):
+        error("With iso_x and iso_h, you need to have that \n    langevin_noise_stddev = train_noise_stddev * np.sqrt(2).")
+
+    logged_simulated_samples_x = np.zeros((n_iter, simulated_samples_x.shape[0], simulated_samples_x.shape[1]))
 
     for i in range(n_iter):
-        logged_simulated_samples[i,:,:] = simulated_samples
+        logged_simulated_samples_x[i,:,:] = simulated_samples_x
+        simulated_samples_h = None
         print("iteration %d done" % i)
         for _ in range(n_sub_iter):
 
             if noise_method == 'iso_x':
                 # isotropic noise added to every sample
-                simulated_samples = simulated_samples + np.random.normal(scale = noise_stddev, size = simulated_samples.shape)
+                simulated_samples_x = simulated_samples_x + np.random.normal(scale = noise_stddev, size = simulated_samples_x.shape)
                 # encode_decode is conveniently constructed as a vectored
                 # function along the 0-th dimension
-                simulated_samples = mydae.encode_decode(simulated_samples)
+                simulated_samples_x = mydae.encode_decode(simulated_samples_x)
             elif noise_method == 'iso_h':
-                simulated_samples_h = mydae.encode(simulated_samples)
+                simulated_samples_h = mydae.encode(simulated_samples_x)
                 simulated_samples_h = simulated_samples_h + np.random.normal(scale = noise_stddev, size = simulated_samples_h.shape)
-                simulated_samples = mydae.decode(simulated_samples_h)
-            elif noise_method == 'JTJ_h':
-                # unfortunately, we don't have a vectorized version of this code for the jacobian of the encoder
-                simulated_samples_h = mydae.encode(simulated_samples)
+                simulated_samples_x = mydae.decode(simulated_samples_h)
+            elif noise_method == 'JJT_h_old':
+                simulated_samples_h = mydae.encode(simulated_samples_x)
                 for k in range(simulated_samples_h.shape[0]):
                     # Compute the jacobian J, draw from a normal, matrix-multiply by J
                     # and that gets you a normal drawn from covariance J^TJ.
                     # We still have the noise_stddev in there even though we're
                     # no longer totally sure where it should really be.
-                    J = mydae.encoder_jacobian_single(simulated_samples[k,:])
+                    J = mydae.encoder_jacobian_single(simulated_samples_x[k,:])
                     # print J.shape
                     # print simulated_samples.shape
                     #
                     # So it's J multiplying normal noise in the space of dimension of X ?
-                    e = J.dot(np.random.normal(scale = noise_stddev, size = (simulated_samples.shape[1],1)))
+                    e = J.dot(np.random.normal(scale = langevin_noise_stddev, size = (simulated_samples_x.shape[1],1)))
                     # print e.shape
                     simulated_samples_h[k,:] = simulated_samples_h[k,:] + e.reshape((-1,))
 
+                simulated_samples_x = mydae.decode(simulated_samples_h)
+            elif noise_method == 'JJT_h' or noise_method == 'JJTJJT_h':
 
-                simulated_samples = mydae.decode(simulated_samples_h)
+                a = langevin_noise_stddev ** 2 / ((train_noise_stddev**2) * 2)
+
+                # Since the simulation is from the perspective of the
+                # hidden units, we have to pick an initial state for
+                # the very first time around.
+                if simulated_samples_h == None:
+                    simulated_samples_h = mydae.encode(simulated_samples_x)
+
+                # Weird only on the first iteration, but this is
+                #    x^{(t)} = g( h^{(t-1)} )
+                simulated_samples_x = mydae.decode(simulated_samples_h)
+                f_xt = mydae.encode(simulated_samples_x)
+                # avoid memory allocations
+                noise_mean = np.zeros((simulated_samples_h.shape[1],))
+
+                for k in range(simulated_samples_h.shape[0]):
+                    # Compute the jacobian J, draw from a normal, matrix-multiply by J
+                    # and that gets you a normal drawn from covariance J^TJ.
+                    # We still have the noise_stddev in there even though we're
+                    # no longer totally sure where it should really be.
+                    J = mydae.encoder_jacobian_single(simulated_samples_x[k,:])
+                    if noise_method == 'JJT_h':
+                        e = J.dot(np.random.normal(scale = langevin_noise_stddev, size = (simulated_samples_x.shape[1],1)))
+                    else:
+                        # 'JJTJTJ'
+                        JJT = J.dot(J.T)
+                        e = np.random.multivariate_normal(mean = noise_mean, cov = langevin_noise_stddev*langevin_noise_stddev * JJT.dot(JJT.T))
+
+                    simulated_samples_h[k,:] = (  (1-a)*simulated_samples_h[k,:] 
+                                                +     a*f_xt[k,:]
+                                                +       e.reshape((-1,))         )
+                # At this point we have set the values
+                #    h^{(t+1)} = (1-\frac{\sigma^2}{2 \lambda}) h^{(t)}
+                #                + \frac{\sigma^{2}}{2\lambda}  f(g(h^{(t)}))
+                #                + \sigma J(x^{(t)}) \epsilon_{t}
+                # for the next iteration.
             else:
                 error('noise_method not recognized : ' + noise_method)
 
-    return logged_simulated_samples
+    return logged_simulated_samples_x
 
 
 def write_simulated_samples_frames(logged_simulated_samples, filename_generator_function, window_width=1.0, center=(0.0, 0.0)):
@@ -106,6 +149,24 @@ def main():
 
     if len(sys.argv) < 3:
         error("You need two arguments. The pickled results file, and the output directory for the simulated frames.")
+
+    # Having an option to read some parameters as json fed
+    # as argument.
+    if len(sys.argv) >= 4:
+        import json
+        override_params = json.loads(sys.argv[3])
+        print override_params
+        for k in override_params.keys():
+            if not k in ['n_simulated_samples',
+                         'n_iter',
+                         'n_sub_iter',
+                         'noise_method',
+                         'langevin_noise_stddev',
+                         'langevin_a']:
+                error('You probably misspelled a parameter to override.')
+    else:
+        override_params = {}
+
 
     pickled_results_file = sys.argv[1]
     simulated_frames_output_dir = sys.argv[2]
@@ -135,16 +196,68 @@ def main():
 
     train_noise_stddev = E['train_noise_stddev']
 
+    if 'n_simulated_samples' not in override_params.keys():
+        n_simulated_samples = 100
+    else:
+        n_simulated_samples = override_params['n_simulated_samples']
+
     # We start all the samples at the same place on the spiral.
-    n_simulated_samples = 100
     simulated_samples = np.tile(get_starting_point_for_spiral().reshape((1,-1)), (n_simulated_samples, 1))
 
-    n_iter = 100
-    n_sub_iter = 100
+    if 'n_iter' not in override_params.keys():
+        n_iter = 100
+    else:
+        n_iter = override_params['n_iter']
 
-    # should check if we have to multiply by sqrt(2)=1.414
+    if 'n_sub_iter' not in override_params.keys():
+        n_sub_iter = 100
+    else:
+        n_sub_iter = override_params['n_sub_iter']
 
-    logged_simulated_samples = run_langevin_simulation(mydae, simulated_samples, train_noise_stddev * 1.414, n_iter, n_sub_iter, noise_method='JTJ_h')
+    if 'noise_method' not in override_params.keys():
+        noise_method = "JJT_h"
+    else:
+        noise_method = override_params['noise_method']
+
+
+    # In our equations, we have that
+    #     'langevin_noise_stddev' is 'sigma'
+    #     'train_noise_stddev'    is 'sqrt(lambda)'
+    #
+    # The most default value is to take
+    #     langevin_noise_stddev = train_noise_stddev * np.sqrt(2)
+    # which corresponds to having the ratio be sigma^2 / lambda = 1
+    # which eliminates a certain extra term in h.
+    #
+    # We would expect that
+    #     langevin_noise_stddev <= train_noise_stddev * np.sqrt(2)
+    # because otherwise we'd have some kind of reverse dynamics happening.
+    # 
+    # If you are in the context of
+    #     noise_method = 'iso_x'
+    #     noise_method = 'iso_h'
+    # this does not apply and we expect to have that
+    #     langevin_noise_stddev = train_noise_stddev * np.sqrt(2)
+    # just to be sure that you're aware of what is happening.
+
+    if 'langevin_noise_stddev' not in override_params.keys():
+        langevin_noise_stddev = train_noise_stddev * np.sqrt(2)
+    else:
+        langevin_noise_stddev = override_params['langevin_noise_stddev']
+
+    # 'a' is the constant that will be used to determine how much
+    # of the new and how much of the old we want to use when
+    # running the 'JJT_h' method. It's there for convenience because
+    # you can always set 'langevin_noise_stddev' manually instead.
+    if 'langevin_a' in override_params.keys():
+        langevin_noise_stddev = np.sqrt(override_params['langevin_a']) * train_noise_stddev * np.sqrt(2)
+
+
+    logged_simulated_samples = run_langevin_simulation(mydae, simulated_samples,
+                                                       train_noise_stddev,
+                                                       langevin_noise_stddev,
+                                                       n_iter, n_sub_iter,
+                                                       noise_method = noise_method)
 
     write_simulated_samples_frames(logged_simulated_samples,
                                    lambda i: os.path.join(simulated_frames_output_dir, "simulation_frame_%0.5d.png" % i),
@@ -152,6 +265,15 @@ def main():
 
     # Save the results for future use.
     cPickle.dump(logged_simulated_samples, open(os.path.join(simulated_frames_output_dir, "logged_simulated_samples.pkl"), "w"))
+
+    f = open(os.path.join(simulated_frames_output_dir, "parameters.txt"), "w")
+    f.write("pickled_results_file = %s\n" % pickled_results_file)
+    f.write("n_iter = %d\n" % n_iter)
+    f.write("n_sub_iter = %d\n" % n_sub_iter)
+    f.write("noise_method = %s\n" % (noise_method,))
+    f.write("train_noise_stddev = %f\n" % train_noise_stddev)
+    f.write("langevin_noise_stddev = %f\n" % langevin_noise_stddev)
+    f.close()
 
     # Now we'll generate a collection of possibly useful plots for the ICLR paper.
     # Maybe it would be better to skip the first half of the points, but
@@ -161,7 +283,8 @@ def main():
     #                                             for i in range logged_simulated_samples.shape[0]
     #                                             for j in range logged_simulated_samples.shape[1]])
 
-    combined_logged_simulated_samples = logged_simulated_samples.reshape((1,-1,logged_simulated_samples.shape[2]))
+    # Cut the first half of the data as burn-in when producing the plots that have all the history at once.
+    combined_logged_simulated_samples = logged_simulated_samples[n_iter/2:,:,:].reshape((1,-1,logged_simulated_samples.shape[2]))
     write_simulated_samples_frames(combined_logged_simulated_samples,
                                    lambda i: os.path.join(simulated_frames_output_dir, "all_frames_width_0.5.png"),
                                    window_width=0.5)

@@ -8,8 +8,17 @@ import sys
 if len(sys.argv) > 1:
     import json
     override_params = json.loads(sys.argv[1])
-
-
+    print override_params
+    for k in override_params.keys():
+        if not k in ['want_rare_large_noise',
+                     'spiral_samples_noise_stddev',
+                     'train_noise_stddev',
+                     'maxiter',
+                     'n_hiddens',
+                     'n_spiral_original_samples']:
+            error('You probably misspelled a parameter to override.')
+else:
+    override_params = {}
 
 import numpy as np
 #np.random.seed(38730)
@@ -37,7 +46,11 @@ import debian_spiral
 # Now that we fix the training data, we have to insist
 # on the difference between original data and noisy replicated
 # versions of that original data.
-n_spiral_original_samples = 1000
+if 'n_spiral_original_samples' not in override_params.keys():
+    n_spiral_original_samples = 1000
+else:
+    n_spiral_original_samples = override_params['n_spiral_original_samples']
+
 if 'spiral_samples_noise_stddev' not in override_params.keys():
     spiral_samples_noise_stddev = 0.0
 else:
@@ -118,6 +131,9 @@ elif (method == 'fmin_cg' or
                          'gtol' : 1.0e-3,
                          'maxiter' : 1000,
                          'avextol' : 1.0e-4}
+    if 'maxiter' in override_params.keys():
+        optimization_args['maxiter'] = override_params['maxiter']
+
     dae_train_scipy_optimize.fit(mydae,
                                  X = clean_data,
                                  noisy_X = noisy_data,
