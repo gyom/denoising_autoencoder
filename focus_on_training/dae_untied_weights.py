@@ -170,7 +170,6 @@ class DAE_untied_weights(DAE):
 
         Returns  loss: array-like, shape (n_examples,)
         """
-
         return self.theano_loss(self.Wb, self.Wc, self.b, self.c, self.s, noisy_X, X)
 
 
@@ -181,16 +180,34 @@ class DAE_untied_weights(DAE):
         self.c  = np.random.uniform( low = -0.1, high = 0.1, size=(self.n_hiddens,) )
         self.s  = 1.0
 
+    
+    # tip : Write the U(q) and grad_U(q) methods
+    #       first to figure out what you'll need to implement here.
+    #       Otherwise you can't design the interface here beforehand.
 
-    #def extract(self):
-    #    return (self.Wb, self.Wc, self.b, self.c)
+    def q_read_params(self):
+        return DAE_untied_weights.serialize_params_as_q(self.Wb, self.Wc, self.b, self.c, self.s)
+
+    def q_set_params(self, q):
+        (self.Wb, self.Wc, self.b, self.c, self.s) = DAE_untied_weights.read_params_from_q(q, self.n_inputs, self.n_hiddens)
+
+    def q_grad(self, q, X, noisy_X):
+        (grad_Wb, grad_Wc, grad_b, grad_c, grad_s) = self.theano_gradients(Wb, Wc, b, c, noisy_X, X)
+        return DAE_untied_weights.serialize_params_as_q(grad_Wb, grad_Wc, grad_b, grad_c, grad_s)
+
+    def q_loss(self, q, X, noisy_X):
+        (Wb, Wc, b, c, s) = DAE_untied_weights.read_params_from_q(q, self.n_inputs, self.n_hiddens)
+        return self.theano_loss(Wb, Wc, b, c, s, noisy_X, X)
+
+
 
     @staticmethod
-    def serialize_params_as_q(Wb, Wc, b, c):
+    def serialize_params_as_q(Wb, Wc, b, c, s):
         return np.hstack((Wb.reshape((-1,)),
                           Wc.reshape((-1,)),
                           b.reshape((-1,)),
-                          c.reshape((-1,)))).reshape((-1,))
+                          c.reshape((-1,)),
+                          s)).reshape((-1,))
 
     @staticmethod
     def read_params_from_q(q, n_inputs, n_hiddens):
@@ -199,19 +216,22 @@ class DAE_untied_weights(DAE):
         n_elems_Wc = n_inputs * n_hiddens
         n_elems_b = n_inputs
         n_elems_c = n_hiddens
+        n_elems_s = 1
 
         bounds = (0,
                   n_elems_Wb,
                   n_elems_Wb + n_elems_Wc,
                   n_elems_Wb + n_elems_Wc + n_elems_b,
-                  n_elems_Wb + n_elems_Wc + n_elems_b + n_elems_c)
+                  n_elems_Wb + n_elems_Wc + n_elems_b + n_elems_c,
+                  n_elems_Wb + n_elems_Wc + n_elems_b + n_elems_c + 1)
 
         Wb = q[ bounds[0] : bounds[1] ].reshape((n_inputs, n_hiddens)).copy()
         Wc = q[ bounds[1] : bounds[2] ].reshape((n_inputs, n_hiddens)).copy()
         b  = q[ bounds[2] : bounds[3] ].reshape((n_elems_b,)).copy()
         c  = q[ bounds[3] : bounds[4] ].reshape((n_elems_c,)).copy()
-        
-        return (Wb, Wc, b, c)
+        s  = q[ bounds[4] : bounds[5] ].reshape((n_elems_s,))[0]
+
+        return (Wb, Wc, b, c, s)
 
 
 
