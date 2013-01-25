@@ -26,7 +26,7 @@ class DAE_untied_weights(DAE):
                  Wc=None, Wb=None,
                  c=None,  b=None,
                  s=None, act_func=['tanh', 'tanh'],
-                 want_plus_x = False)
+                 want_plus_x = False):
         """
         Initialize a DAE.
         
@@ -102,22 +102,25 @@ class DAE_untied_weights(DAE):
         x = T.dmatrix('x')
     
         h_act = T.dot(x, Wc) + c
-        if act_func[0] == 'tanh':
+        if self.act_func[0] == 'tanh':
             h = T.tanh(h_act)
-        elif act_func[0] == 'sigmoid':
+        elif self.act_func[0] == 'sigmoid':
             h = T.nnet.sigmoid(h_act)
-        else act_func[0] == 'id':
+        elif self.act_func[0] == 'id':
             # bad idae
             h = h_act
-
+        else:
+            error("Invalid act_func[0]")
 
         r_act = T.dot(h, Wb.T) + b
-        if act_func[1] == 'tanh':
+        if self.act_func[1] == 'tanh':
             r = s * T.tanh(r_act)
-        elif act_func[1] == 'sigmoid':
+        elif self.act_func[1] == 'sigmoid':
             r = s * T.nnet.sigmoid(r_act)
-        else act_func[1] == 'id':
+        elif self.act_func[1] == 'id':
             r = s * r_act
+        else:
+            error("Invalid act_func[1]")
 
         if self.want_plus_x:
             r = r + x
@@ -192,7 +195,8 @@ class DAE_untied_weights(DAE):
         (self.Wb, self.Wc, self.b, self.c, self.s) = DAE_untied_weights.read_params_from_q(q, self.n_inputs, self.n_hiddens)
 
     def q_grad(self, q, X, noisy_X):
-        (grad_Wb, grad_Wc, grad_b, grad_c, grad_s) = self.theano_gradients(Wb, Wc, b, c, noisy_X, X)
+        (Wb, Wc, b, c, s) = DAE_untied_weights.read_params_from_q(q, self.n_inputs, self.n_hiddens)
+        (grad_Wb, grad_Wc, grad_b, grad_c, grad_s) = self.theano_gradients(Wb, Wc, b, c, s, noisy_X, X)
         return DAE_untied_weights.serialize_params_as_q(grad_Wb, grad_Wc, grad_b, grad_c, grad_s)
 
     def q_loss(self, q, X, noisy_X):
