@@ -10,25 +10,60 @@ n_samples = 500
 thinning_factor = 1000
 burn_in = n_samples * thinning_factor / 10
 
-mcmc_method = 'metropolis_hastings_E'
+langevin_lambda = 0.01
+
+#mcmc_method = 'langevin'
+mcmc_method = 'metropolis_hastings_langevin_E'
+#mcmc_method = 'metropolis_hastings_langevin_grad_E'
+#mcmc_method = 'metropolis_hastings_E'
 #mcmc_method = 'metropolis_hastings_grad_E'
 
 import metropolis_hastings_sampler
 # Don't start right on the origin because strange
 # things can happen with the polar coordinates there.
 x0 = np.random.normal(size=(2,))
-symmetric_proposal = lambda x: x + np.random.normal(size=x.shape, scale = proposal_stddev)
+
 
 if mcmc_method == 'metropolis_hastings_E':
+
+    symmetric_proposal = lambda x: x + np.random.normal(size=x.shape, scale = proposal_stddev)
     (X, acceptance_ratio) = metropolis_hastings_sampler.run_chain_with_energy(ninja_star_distribution.E, x0, symmetric_proposal, n_samples, thinning_factor = thinning_factor, burn_in = burn_in)
+
+
 elif mcmc_method == 'metropolis_hastings_grad_E':
+
+    symmetric_proposal = lambda x: x + np.random.normal(size=x.shape, scale = proposal_stddev)
     (X, acceptance_ratio) = metropolis_hastings_sampler.run_chain_with_energy(None, x0, symmetric_proposal, n_samples, thinning_factor = thinning_factor, burn_in = burn_in, grad_E = ninja_star_distribution.grad_E)
+
+
+elif mcmc_method == 'langevin':
+
+    (asymmetric_proposal, _) = metropolis_hastings_sampler.make_langevin_sampler_requirements(langevin_lambda, ninja_star_distribution.grad_E)
+    asymmetric_proposal_without_correction_factor = lambda current_x: (asymmetric_proposal(current_x)[0], 0.0)
+    # Using a fake energy to make sure that every move is accepted.
+    fake_E = lambda current_x: 0.0
+    (X, acceptance_ratio) = metropolis_hastings_sampler.run_chain_with_energy(fake_E, x0, None, n_samples, thinning_factor = thinning_factor, burn_in = burn_in, asymmetric_proposal = asymmetric_proposal_without_correction_factor)
+
+
+elif mcmc_method == 'metropolis_hastings_langevin_E':
+
+    (asymmetric_proposal, _) = metropolis_hastings_sampler.make_langevin_sampler_requirements(langevin_lambda, ninja_star_distribution.grad_E)
+    (X, acceptance_ratio) = metropolis_hastings_sampler.run_chain_with_energy(ninja_star_distribution.E, x0, None, n_samples, thinning_factor = thinning_factor, burn_in = burn_in, asymmetric_proposal = asymmetric_proposal)
+
+
+elif mcmc_method == 'metropolis_hastings_langevin_grad_E':
+
+    (asymmetric_proposal, _) = metropolis_hastings_sampler.make_langevin_sampler_requirements(langevin_lambda, ninja_star_distribution.grad_E)
+    (X, acceptance_ratio) = metropolis_hastings_sampler.run_chain_with_energy(None, x0, None, n_samples, thinning_factor = thinning_factor, burn_in = burn_in, grad_E = ninja_star_distribution.grad_E, asymmetric_proposal = asymmetric_proposal)
+
 else:
     error("Unrecognized value for parameter 'mcmc_method' : %s" % (mcmc_method,))
 
-
-
 print "Got the samples. Acceptance ratio was %f" % acceptance_ratio
+
+cross_entropy = ninja_star_distribution.cross_entropy(X)
+
+print "The cross-entropy of the samples is %f. Smaller values are best." % cross_entropy
 
 
 # Implement metropolis_hastings_sampler.run_chain_with_energy

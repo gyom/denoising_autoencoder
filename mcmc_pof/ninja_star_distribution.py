@@ -49,7 +49,7 @@ def grad_E(X):
 def mesh_pdf(mesh_x, mesh_y):
     """
     M = 5.0
-    mesh_x,mesh_y = ogrid[-M:M:.01, -M:M:.01]
+    mesh_x,mesh_y = np.mgrid[-M:M:.01, -M:M:.01]
     """
     x = mesh_x
     y = mesh_y
@@ -63,5 +63,49 @@ def mesh_pdf(mesh_x, mesh_y):
     intz = z.sum()
     delta_x = mesh_x[1][0] - mesh_x[0][0]
     delta_y = mesh_y[0][1] - mesh_y[0][0]
+
     return (z / intz * delta_x * delta_y)
 
+
+
+def compute_normalizing_constant():
+    M = 5.0
+    mesh_x,mesh_y = np.mgrid[-M:M:.01, -M:M:.01]
+
+    x = mesh_x
+    y = mesh_y
+    
+    z_energy = ((np.sqrt(x**2 + y**2) - ring_radius)**2   +
+                (x**2 - y**2)**2 +
+                0.5 * np.log(x**2 + y**2 + log_offset) )
+    z = np.exp( - z_energy )
+
+    # We will attempt here to normalize the density.
+    intz = z.sum()
+    delta_x = mesh_x[1][0] - mesh_x[0][0]
+    delta_y = mesh_y[0][1] - mesh_y[0][0]
+
+    return intz * delta_x * delta_y
+
+
+
+def cross_entropy(X):
+    """
+    See p.88 of Kevin Murphy's book.
+    """
+
+    if len(X.shape) == 1:
+        x = X[0]
+        y = X[1]
+    else:
+        x = X[:,0]
+        y = X[:,1]
+
+    normalizing_constant = compute_normalizing_constant()
+
+    energy_values = ((np.sqrt(x**2 + y**2) - ring_radius)**2   +
+                (x**2 - y**2)**2 +
+                0.5 * np.log(x**2 + y**2 + log_offset) )
+
+    return energy_values.mean() + np.log(normalizing_constant)
+    
