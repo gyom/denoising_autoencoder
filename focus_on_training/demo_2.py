@@ -6,15 +6,15 @@ import os
 import numpy as np
 
 
-def make_energy(W, b, c, alpha, beta):
+def make_energy(W, b, c, scale_s, scale_plus_x):
     if (len(b.shape) != 1 or
         len(c.shape) != 1 or
         len(W.shape) != 2 or
         b.shape[0] != W.shape[0] or
         c.shape[0] != W.shape[1] or
-        type(alpha) != type(1.0) or
-        type(beta) != type(1.0)):
-        error("Wrong dimensions in one of W, b, c, alpha, beta.")
+        type(scale_s) != type(1.0) or
+        type(scale_plus_x) != type(1.0)):
+        error("Wrong dimensions in one of W, b, c, scale_s, scale_plus_x.")
 
     def overflow_protection(A):
         # find something to do like the softplus log(1+exp(x)) that turns into x when x > 70
@@ -33,7 +33,7 @@ def make_energy(W, b, c, alpha, beta):
         # 's' applied to both terms
         #return s * (- main_term + exponential_penalty)
         # 's' applied only to the main term and not the exponential penalty
-        return - alpha * main_term + beta * exponential_penalty)
+        return - scale_s * main_term + scale_plus_x * exponential_penalty
     return E
 
 
@@ -44,18 +44,24 @@ n_inputs = 2
 model_W = np.random.normal(size=(n_inputs, n_hiddens), scale = 10)
 model_b = np.random.normal(size=(n_inputs,))
 model_c = np.random.normal(size=(n_hiddens,))
-model_alpha = 1.0
-model_beta = 1.0
+model_scale_s = 1.0
+model_scale_plus_x = 1.0
+
+print model_W
+print model_b
+print model_c
+print model_scale_s
+print model_scale_plus_x
 
 print "Got the energy model."
-E_ = make_energy(model_W, model_b, model_c, model_alpha, model_beta)
+E_ = make_energy(model_W, model_b, model_c, model_scale_s, model_scale_plus_x)
 E = lambda x: E_(x.reshape((1,-1)))
 
 
 import metropolis_hastings_sampler
 x0 = np.zeros((n_inputs,))
 symmetric_proposal = lambda x: x + np.random.normal(size=x.shape, scale = 0.1)
-N = 1000
+N = 100
 (X, acceptance_ratio) = metropolis_hastings_sampler.run_chain_with_energy(E, x0, symmetric_proposal, N, thinning_factor = 100, burn_in = 10000)
 
 print "Got the samples. Acceptance ratio was %f" % acceptance_ratio
@@ -63,14 +69,14 @@ print "Got the samples. Acceptance ratio was %f" % acceptance_ratio
 
 
 
-if True:
+if False:
     import matplotlib
     matplotlib.use('Agg')
     import pylab
 
     pylab.scatter(X[:,0], X[:,1])
     pylab.draw()
-    pylab.savefig("/u/alaingui/umontreal/tmp/demo2.png", dpi=300)
+    pylab.savefig("/u/alaingui/umontreal/tmp/demo2_1.png", dpi=300)
     pylab.close()    
 
     quit()
@@ -85,18 +91,39 @@ if True:
 
 print X.shape
 
-from dae_untied_weights import DAE_untied_weights
+from dae_untied_weights_plus_x import DAE_untied_weights_plus_x
 
-mydae = DAE_untied_weights(n_inputs = 2,
-                           n_hiddens = 32,
-                           act_func = ['tanh', 'tanh'],
-                           want_plus_x = False)
+mydae = DAE_untied_weights_plus_x(n_inputs = 2,
+                                  n_hiddens = 16,
+                                  act_func = ['tanh', 'id'])
 
 
 mydae.fit_with_decreasing_noise(X,
                                 [1.0, 0.5, 0.2, 0.1, 0.05, 0.01, 0.001],
                                 {'method' : 'fmin_bfgs',
-                                 'maxiter' : 5000})
+                                 'maxiter' : 500})
+
+print "======================"
+print model_W
+print model_b
+print model_c
+print model_scale_s
+print model_scale_plus_x
+print "======================"
+print mydae.Wb
+print mydae.Wc
+print mydae.b
+print mydae.c
+print mydae.scale_s
+print mydae.scale_plus_x
+print "======================"
+
+
+
+##### !!! TODO !!!
+# You need to pick the right place to plot the grid
+# because it's no longer around the origin.
+##### 
 
 
 clean_data = X
@@ -144,7 +171,8 @@ def plot_grid_reconstruction_grid(mydae, outputfile, plotgrid_N_buckets = 30, wi
     return grid_error
 
 
-output_directory = '/u/alaingui/Documents/tmp'
+#output_directory = '/u/alaingui/Documents/tmp'
+output_directory = '/u/alaingui/umontreal/tmp'
 plot_grid_reconstruction_grid(mydae, os.path.join(output_directory, 'demo_2_tight.png'),
                               plotgrid_N_buckets = 50,
                               window_width = 1.0)
