@@ -1,75 +1,103 @@
 
+
+import time, os, sys, getopt
 import numpy as np
 
-import ninja_star_distribution
-
-
-
-proposal_stddev = 0.1
-n_samples = 500
-thinning_factor = 1000
-burn_in = n_samples * thinning_factor / 10
-
-langevin_lambda = 0.01
-
-#mcmc_method = 'langevin'
-mcmc_method = 'metropolis_hastings_langevin_E'
-#mcmc_method = 'metropolis_hastings_langevin_grad_E'
-#mcmc_method = 'metropolis_hastings_E'
-#mcmc_method = 'metropolis_hastings_grad_E'
-
 import metropolis_hastings_sampler
-# Don't start right on the origin because strange
-# things can happen with the polar coordinates there.
-x0 = np.random.normal(size=(2,))
+
+def usage():
+    print "-- usage example --"
+    print "python script_1.py --n_samples=100 --n_chains=1000 --thinning_factor=100 --langevin_lambda=0.01 --mcmc_method=metropolis_hastings_langevin_E --dataset=ninja_star"
+
+def main():
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "hv", ["help", "n_samples=", "n_chains=", "thinning_factor=", "burn_in=", "langevin_lambda=", "mcmc_method=", "proposal_stddev=", "dataset="])
+    except getopt.GetoptError as err:
+        # print help information and exit:
+        print str(err) # will print something like "option -a not recognized"
+        usage()
+        sys.exit(2)
+
+    sampling_options = {}
+    sampling_options["n_chains"] = None
+
+    output_options = {}
+
+    verbose = False
+    for o, a in opts:
+        if o == "-v":
+            # unused
+            verbose = True
+        elif o in ("-h", "--help"):
+            usage()
+            sys.exit()
+        elif o in ("--n_samples"):
+            sampling_options["n_samples"] = int(a)
+        elif o in ("--thinning_factor"):
+            sampling_options["thinning_factor"] = int(a)
+        elif o in ("--burn_in"):
+            sampling_options["burn_in"] = int(a)
+        elif o in ("--langevin_lambda"):
+            sampling_options["langevin_lambda"] = float(a)
+        elif o in ("--proposal_stddev"):
+            sampling_options["proposal_stddev"] = float(a)
+        elif o in ("--n_chains"):
+            sampling_options["n_chains"] = int(a)
+        elif o in ("--mcmc_method"):
+            sampling_options["mcmc_method"] = a
+            #if not a in ['langevin',
+            #             'metropolis_hastings_langevin_E',
+            #             'metropolis_hastings_langevin_grad_E',
+            #             'metropolis_hastings_E',
+            #             'metropolis_hastings_grad_E']:
+            #    error("Bad name for mcmc_method.")
+        elif o in ("--dataset"):
+            if a == 'ninja_star':
+                import ninja_star_distribution
+                sampling_options["dataset_description"] = "ninja_star"
+                sampling_options["E"] = ninja_star_distribution.E
+                sampling_options["grad_E"] = ninja_star_distribution.grad_E
+            else:
+                "Unrecognized dataset."
+        else:
+            assert False, "unhandled option"
+
+    if sampling_options["dataset_description"] == "ninja_star":
+        if not sampling_options["n_chains"] == None:
+            sampling_options["x0"] = np.random.normal(size=(sampling_options["n_chains"],2))
+        else:
+            sampling_options["x0"] = np.random.normal(size=(2,))
+        
+        output_options["cross_entropy_function"] = ninja_star_distribution.cross_entropy
+    else:
+        error("No dataset was supplied.")
 
 
-if mcmc_method == 'metropolis_hastings_E':
+    results = metropolis_hastings_sampler.mcmc_generate_samples(sampling_options)
 
-    symmetric_proposal = lambda x: x + np.random.normal(size=x.shape, scale = proposal_stddev)
-    (X, acceptance_ratio) = metropolis_hastings_sampler.run_chain_with_energy(ninja_star_distribution.E, x0, symmetric_proposal, n_samples, thinning_factor = thinning_factor, burn_in = burn_in)
+    #{'samples': samples_for_all_chains,
+    # 'elapsed_time':sampling_end_time - sampling_start_time,
+    # 'proposals_per_second':proposals_per_second,
+    # 'acceptance_ratio':combined_acceptance_ratio    }
 
+    print "Got the samples. Acceptance ratio was %f" % results['acceptance_ratio']
+    print "MCMC proposal speed was 10^%0.2f / s" % (np.log(results['proposals_per_second']) / np.log(10), )
 
-elif mcmc_method == 'metropolis_hastings_grad_E':
+    if len(results['samples'].shape) == 2:
+        cross_entropy = output_options['cross_entropy_function'](results['samples'])
+        print "The cross-entropy of the samples is %f. Smaller values are best." % cross_entropy
+    elif len(results['samples'].shape) == 3:
+        cross_entropy = output_options['cross_entropy_function'](results['samples'][:,-1,:])
+        print "The cross-entropy of the samples for all chains at the last time step is %f. Smaller values are best." % cross_entropy
+    else:
+        error("Wrong shape for samples returned !")
 
-    symmetric_proposal = lambda x: x + np.random.normal(size=x.shape, scale = proposal_stddev)
-    (X, acceptance_ratio) = metropolis_hastings_sampler.run_chain_with_energy(None, x0, symmetric_proposal, n_samples, thinning_factor = thinning_factor, burn_in = burn_in, grad_E = ninja_star_distribution.grad_E)
-
-
-elif mcmc_method == 'langevin':
-
-    (asymmetric_proposal, _) = metropolis_hastings_sampler.make_langevin_sampler_requirements(langevin_lambda, ninja_star_distribution.grad_E)
-    asymmetric_proposal_without_correction_factor = lambda current_x: (asymmetric_proposal(current_x)[0], 0.0)
-    # Using a fake energy to make sure that every move is accepted.
-    fake_E = lambda current_x: 0.0
-    (X, acceptance_ratio) = metropolis_hastings_sampler.run_chain_with_energy(fake_E, x0, None, n_samples, thinning_factor = thinning_factor, burn_in = burn_in, asymmetric_proposal = asymmetric_proposal_without_correction_factor)
-
-
-elif mcmc_method == 'metropolis_hastings_langevin_E':
-
-    (asymmetric_proposal, _) = metropolis_hastings_sampler.make_langevin_sampler_requirements(langevin_lambda, ninja_star_distribution.grad_E)
-    (X, acceptance_ratio) = metropolis_hastings_sampler.run_chain_with_energy(ninja_star_distribution.E, x0, None, n_samples, thinning_factor = thinning_factor, burn_in = burn_in, asymmetric_proposal = asymmetric_proposal)
-
-
-elif mcmc_method == 'metropolis_hastings_langevin_grad_E':
-
-    (asymmetric_proposal, _) = metropolis_hastings_sampler.make_langevin_sampler_requirements(langevin_lambda, ninja_star_distribution.grad_E)
-    (X, acceptance_ratio) = metropolis_hastings_sampler.run_chain_with_energy(None, x0, None, n_samples, thinning_factor = thinning_factor, burn_in = burn_in, grad_E = ninja_star_distribution.grad_E, asymmetric_proposal = asymmetric_proposal)
-
-else:
-    error("Unrecognized value for parameter 'mcmc_method' : %s" % (mcmc_method,))
-
-print "Got the samples. Acceptance ratio was %f" % acceptance_ratio
-
-cross_entropy = ninja_star_distribution.cross_entropy(X)
-
-print "The cross-entropy of the samples is %f. Smaller values are best." % cross_entropy
 
 
 # Implement metropolis_hastings_sampler.run_chain_with_energy
 # with grad_E instead.
 
-if True:
+if False:
     import matplotlib
     matplotlib.use('Agg')
     import pylab
@@ -91,9 +119,14 @@ if True:
 
     pylab.draw()
     id_number = int(np.random.uniform(0,10000))
-    outfile = "/u/alaingui/umontreal/tmp/script_1_%s_%0.5d.png" % (mcmc_method, id_number)
+    outfile = "/u/alaingui/umontreal/metropolis_hastings_langevin/script_1_%s_%0.5d.png" % (mcmc_method, id_number)
     pylab.savefig(outfile, dpi=100)
     pylab.close()
     print "Wrote %s" % (outfile,)
 
     quit()
+
+
+
+if __name__ == "__main__":
+    main()
