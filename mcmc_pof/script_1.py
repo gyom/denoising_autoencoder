@@ -74,37 +74,67 @@ def main():
 
 
     results = metropolis_hastings_sampler.mcmc_generate_samples(sampling_options)
-
-    #{'samples': samples_for_all_chains,
-    # 'elapsed_time':sampling_end_time - sampling_start_time,
-    # 'proposals_per_second':proposals_per_second,
-    # 'acceptance_ratio':combined_acceptance_ratio    }
+    #
+    # Returns a dictionary of this form.
+    #
+    # {'samples': numpy array (n_chains, n_samples, d),
+    #  'elapsed_time': seconds as float,
+    #  'proposals_per_second': float,
+    #  'acceptance_ratio': float in [0.0,1.0] }
 
     print "Got the samples. Acceptance ratio was %f" % results['acceptance_ratio']
     print "MCMC proposal speed was 10^%0.2f / s" % (np.log(results['proposals_per_second']) / np.log(10), )
 
-    if len(results['samples'].shape) == 2:
-        cross_entropy = output_options['cross_entropy_function'](results['samples'])
-        print "The cross-entropy of the samples is %f. Smaller values are best." % cross_entropy
-    elif len(results['samples'].shape) == 3:
-        cross_entropy = output_options['cross_entropy_function'](results['samples'][:,-1,:])
-        print "The cross-entropy of the samples for all chains at the last time step is %f. Smaller values are best." % cross_entropy
-    else:
-        error("Wrong shape for samples returned !")
+    #if len(results['samples'].shape) == 2:
+    #    cross_entropy = output_options['cross_entropy_function'](results['samples'])
+    #    print "The cross-entropy of the samples is %f. Smaller values are best." % cross_entropy
+    #elif len(results['samples'].shape) == 3:
+    #    cross_entropy = output_options['cross_entropy_function'](results['samples'][:,-1,:])
+    #    print "The cross-entropy of the samples for all chains at the last time step is %f. Smaller values are best." % cross_entropy
+    #else:
+    #    raise("Wrong shape for samples returned !")
+
+    # TODO : Have that directory be specified as an argument.
+    output_image_dir = "/u/alaingui/Documents/tmp/%s/%d" % ( sampling_options['mcmc_method'], int(time.time()) )
+    os.makedirs(output_image_dir)
+    for n in np.arange(sampling_options['n_samples']):
+        output_image_path = os.path.join(output_image_dir, "frame_%0.6d.png" % n)
+        plot_one_slice_of_ninja_star_samples(results['samples'][:,n,:], output_image_path, dpi=100)
 
 
 
-# Implement metropolis_hastings_sampler.run_chain_with_energy
-# with grad_E instead.
 
-if False:
-    import matplotlib
-    matplotlib.use('Agg')
-    import pylab
-    import matplotlib.pyplot as plt
+# We'll put the imports here just in case the
+# global scope wouldn't be the best idea.
+import matplotlib
+matplotlib.use('Agg')
+import pylab
+import matplotlib.pyplot as plt
+
+
+def plot_one_slice_of_ninja_star_samples(samples_slice, output_image_path, dpi=100):
+    """
+        Samples should be of size (M, d).
+        You would generally pick either one chain alone
+        or one time slice from a set of chains.
+
+        This plotting function doesn't pretend to be
+        a very general method. It assumes that the samples
+        are 2-dimensional and that [-4.0, 4.0]^2 is the
+        best choice of window to plot the samples.
+    """
+
+    import ninja_star_distribution
 
     pylab.hold(True)
-    pylab.scatter(X[:,0], X[:,1])
+
+    x = samples_slice[:,0]
+    y = samples_slice[:,1]
+
+    # TODO : pick better color for the sample dots
+    pylab.scatter(x, y)
+    # TODO : stamp the KL divergence on the plots
+
 
     print "Computing the original pdf values."
     M = 4.0
@@ -118,13 +148,10 @@ if False:
     #d = plt.colorbar(model_pdf_value_plot_handle, orientation='horizontal')
 
     pylab.draw()
-    id_number = int(np.random.uniform(0,10000))
-    outfile = "/u/alaingui/umontreal/metropolis_hastings_langevin/script_1_%s_%0.5d.png" % (mcmc_method, id_number)
-    pylab.savefig(outfile, dpi=100)
+    #pylab.savefig(output_image_path)
+    pylab.savefig(output_image_path, dpi=dpi)
     pylab.close()
-    print "Wrote %s" % (outfile,)
 
-    quit()
 
 
 
