@@ -108,4 +108,30 @@ def cross_entropy(X):
                 0.5 * np.log(x**2 + y**2 + log_offset) )
 
     return energy_values.mean() + np.log(normalizing_constant)
-    
+
+
+
+
+def main():
+    import metropolis_hastings_sampler
+    sampling_options = {}
+    sampling_options["E"] = E
+    sampling_options["proposal_stddev"] = 0.1
+    sampling_options["thinning_factor"] = 10000
+    sampling_options["n_samples"] = 10000
+    sampling_options["mcmc_method"] = "metropolis_hastings_E"
+    results = metropolis_hastings_sampler.mcmc_generate_samples(sampling_options)
+
+
+    import cPickle
+    output_pkl_name = "ninja_star_metropolis_hasting_samples_n_%d_thin_%d_prop_stddev_%f.pkl" % (sampling_options["n_samples"], sampling_options["thinning_factor"], sampling_options["proposal_stddev"])
+    f = open(output_pkl_name, "w")
+    cPickle.dump(results['samples'], f)
+    f.close()
+
+    print "Acceptance ratio : %f" % results["acceptance_ratio"]
+    print "Wrote %s" % (output_pkl_name, )
+
+
+if __name__ == "__main__":
+    main()

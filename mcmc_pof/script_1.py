@@ -11,7 +11,7 @@ def usage():
 
 def main():
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hv", ["help", "n_samples=", "n_chains=", "thinning_factor=", "burn_in=", "langevin_lambda=", "mcmc_method=", "proposal_stddev=", "dataset="])
+        opts, args = getopt.getopt(sys.argv[1:], "hv", ["help", "n_samples=", "n_chains=", "thinning_factor=", "burn_in=", "langevin_lambda=", "mcmc_method=", "proposal_stddev=", "dataset=", "output_dir_prefix=", "reference_pickled_samples_for_KL=", "reference_stddev_for_KL="])
     except getopt.GetoptError as err:
         # print help information and exit:
         print str(err) # will print something like "option -a not recognized"
@@ -59,6 +59,12 @@ def main():
                 sampling_options["grad_E"] = ninja_star_distribution.grad_E
             else:
                 "Unrecognized dataset."
+        elif o in ("--output_dir_prefix"):
+            output_options['output_dir_prefix'] = a
+        elif o in ("--reference_pickled_samples_for_KL"):
+            output_options['reference_pickled_samples_for_KL'] = a
+        elif o in ("--reference_stddev_for_KL"):
+            output_options['reference_stddev_for_KL'] = float(a)
         else:
             assert False, "unhandled option"
 
@@ -85,6 +91,28 @@ def main():
     print "Got the samples. Acceptance ratio was %f" % results['acceptance_ratio']
     print "MCMC proposal speed was 10^%0.2f / s" % (np.log(results['proposals_per_second']) / np.log(10), )
 
+
+    if len(results['samples'].shape) == 2:
+
+        # We will evaluate an approximate KL divergence if we are given a
+        # reference set of samples from the true distribution.
+        if output_options.has_key("reference_pickled_samples_for_KL"):
+
+            import KL_approximation
+            import cPickle
+            assert os.path.exists(output_options["reference_pickled_samples_for_KL"])
+            f = open(output_options["reference_pickled_samples_for_KL"])
+            reference_sample = cPickle.load(f)
+
+            if output_options.has_key("reference_stddev_for_KL"):
+                reference_stddev_for_KL = output_options["reference_stddev_for_KL"]
+            else:
+                reference_stddev_for_KL = None
+
+            KL_value = KL_approximation.KL(reference_sample, results['samples'], 2000, 2000, stddev = reference_stddev_for_KL)
+            print "We got a KL divergence value of %f" % KL_value
+
+
     #if len(results['samples'].shape) == 2:
     #    cross_entropy = output_options['cross_entropy_function'](results['samples'])
     #    print "The cross-entropy of the samples is %f. Smaller values are best." % cross_entropy
@@ -93,13 +121,33 @@ def main():
     #    print "The cross-entropy of the samples for all chains at the last time step is %f. Smaller values are best." % cross_entropy
     #else:
     #    raise("Wrong shape for samples returned !")
-
+    
     # TODO : Have that directory be specified as an argument.
-    output_image_dir = "/u/alaingui/Documents/tmp/%s/%d" % ( sampling_options['mcmc_method'], int(time.time()) )
+    #output_image_dir = "/u/alaingui/Documents/tmp/%s/%d" % ( sampling_options['mcmc_method'], int(time.time()) )
+    output_image_dir = "%s/%s/%d" % (output_options["output_dir_prefix"], sampling_options['mcmc_method'], int(time.time()) )
     os.makedirs(output_image_dir)
-    for n in np.arange(sampling_options['n_samples']):
-        output_image_path = os.path.join(output_image_dir, "frame_%0.6d.png" % n)
-        plot_one_slice_of_ninja_star_samples(results['samples'][:,n,:], output_image_path, dpi=100)
+
+    if len(results['samples'].shape) == 2:
+    
+        output_image_path = os.path.join(output_image_dir, "whole_chain.png")
+        plot_one_slice_of_ninja_star_samples(results['samples'], output_image_path, dpi=200)
+    
+    elif len(results['samples'].shape) == 3:
+
+        for n in np.arange(sampling_options['n_samples']):
+            output_image_path = os.path.join(output_image_dir, "frame_%0.6d.png" % n)
+            plot_one_slice_of_ninja_star_samples(results['samples'][:,n,:], output_image_path, dpi=100)
+
+        import subprocess
+        #export MOVIEDIR=${HOME}/Documents/tmp/metropolis_hastings_E/1359965409
+        #ffmpeg -i ${MOVIEDIR}/frame_%06d.png -vcodec libx264 -vpre hq -crf 22 -r 10 ${MOVIEDIR}/seq.mp4
+        subprocess.check_output(["ffmpeg", "-i", output_image_dir + r"/frame_%06d.png", "-y", "-vcodec", "libx264", "-vpre", "hq", "-crf", "22", "-r", "10", output_image_dir + r"/assembled.mp4"])
+        print "Generated movie at %s." % (output_image_dir + r"/assembled.mp4", )
+    else:
+        raise("Wrong shape for samples returned !")
+    
+
+    
 
 
 

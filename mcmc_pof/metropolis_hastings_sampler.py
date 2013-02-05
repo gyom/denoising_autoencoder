@@ -165,6 +165,9 @@ def run_chain_with_langevin_proposals(x0, N, langevin_lambda, E = None, grad_E =
     def exact_energy_difference(proposed_x, current_x):
         return E(proposed_x) - E(current_x)
 
+    def zero_energy_difference(proposed_x, current_x):
+        return 0.0
+
 
     assert langevin_lambda > 0.0, "It doesn't make sense to have the langevin lambda be less than 0. With 0.0, a lot becomes pointless."
 
@@ -178,6 +181,7 @@ def run_chain_with_langevin_proposals(x0, N, langevin_lambda, E = None, grad_E =
         # This is the approximation that plays the most important
         # role in our paper.
         grad_E = lambda x: (r(x) - x) / langevin_lambda
+        energy_difference = zero_energy_difference
     elif E == None and grad_E == None and r == None:
         raise("You need to provide E, grad_E or r.")
     else:
@@ -236,7 +240,7 @@ def run_chain_with_langevin_proposals(x0, N, langevin_lambda, E = None, grad_E =
     iterate_N_times.accepted_counter = 0
     iterate_N_times.rejected_counter = 0
 
-        
+
     for n in np.arange(0,N):
         (current_x, preimage_current_x) = iterate_N_times(current_x, preimage_current_x, energy_difference, thinning_factor)
         # collect sample after running through the thinning iterations
@@ -265,7 +269,7 @@ def mcmc_generate_samples(sampling_options):
     n_samples       = get_dict_key_or_default(sampling_options, 'n_samples',       None, True)
     thinning_factor = get_dict_key_or_default(sampling_options, 'thinning_factor', 100)
     burn_in         = get_dict_key_or_default(sampling_options, 'burn_in',         n_samples * thinning_factor / 10)
-    langevin_lambda = get_dict_key_or_default(sampling_options, 'langevin_lambda', None, True)
+    langevin_lambda = get_dict_key_or_default(sampling_options, 'langevin_lambda', None)
     mcmc_method     = get_dict_key_or_default(sampling_options, 'mcmc_method',     None, True)
     x0              = get_dict_key_or_default(sampling_options, 'x0',              np.random.normal(size=(2,)))
     n_chains        = get_dict_key_or_default(sampling_options, 'n_chains',        None)
@@ -276,6 +280,8 @@ def mcmc_generate_samples(sampling_options):
 
     # Run a sanity check to be sure that E and grad_E take the correct input dimension given by x0.
     # This could later be used to poke around to see if E and grad_E are vectorial or not.
+
+    #assert not(proposal_stddev == None) and not(langevin_lambda == None)
 
     # We accept values for x0 that are of size (n_chains, d) or (d,).
 
@@ -294,7 +300,7 @@ def mcmc_generate_samples(sampling_options):
     else:
         want_vectorial_result = True
 
-    if want_vectorial_result and len(x0.shape) == 1:
+    if len(x0.shape) == 1:
         x0 = np.tile(x0.reshape((1,d)),(n_chains,1))
 
 
@@ -344,6 +350,10 @@ def mcmc_generate_samples(sampling_options):
     #print "Got the samples. Acceptance ratio was %f" % combined_acceptance_ratio
     proposals_per_second = (n_chains * n_samples * thinning_factor + burn_in) / (sampling_end_time - sampling_start_time)
     #print "MCMC proposal speed was 10^%0.2f / s" % (np.log(proposals_per_second) / np.log(10), )
+
+    if not want_vectorial_result:
+        assert samples_for_all_chains.shape[0] == 1
+        samples_for_all_chains = samples_for_all_chains[0,:,:]
 
     return {'samples': samples_for_all_chains,
             'elapsed_time':sampling_end_time - sampling_start_time,
