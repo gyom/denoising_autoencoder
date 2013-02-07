@@ -121,7 +121,7 @@ def make_langevin_sampler_requirements(langevin_lambda, grad_E=None, r=None):
         # Note that the resulting function 'r' can be applied
         # to a whole collected of stacked values of x when
         # grad_E accommodates it.
-        r = lambda x: x + langevin_lambda * grad_E(x)
+        r = lambda x: x - langevin_lambda * grad_E(x)
 
     def asymmetric_proposal(current_x):
 
@@ -180,7 +180,7 @@ def run_chain_with_langevin_proposals(x0, N, langevin_lambda, E = None, grad_E =
     elif E == None and grad_E == None and not r == None:
         # This is the approximation that plays the most important
         # role in our paper.
-        grad_E = lambda x: (r(x) - x) / langevin_lambda
+        grad_E = lambda x: - (r(x) - x) / langevin_lambda
         energy_difference = zero_energy_difference
     elif E == None and grad_E == None and r == None:
         raise("You need to provide E, grad_E or r.")
@@ -191,7 +191,7 @@ def run_chain_with_langevin_proposals(x0, N, langevin_lambda, E = None, grad_E =
         # Note that the resulting function 'r' can be applied
         # to a whole collected of stacked values of x when
         # grad_E accommodates it.
-        r = lambda x: x + langevin_lambda * grad_E(x)
+        r = lambda x: x - langevin_lambda * grad_E(x)
 
 
     def langevin_proposal(current_x, preimage_current_x):
@@ -311,10 +311,12 @@ def mcmc_generate_samples(sampling_options):
     for c in np.arange(n_chains):
 
         if mcmc_method == 'metropolis_hastings_E':
+            assert proposal_stddev > 0.0
             symmetric_proposal = lambda x: x + np.random.normal(size=x.shape, scale = proposal_stddev)
             (X, acceptance_ratio) = run_chain_with_energy(E, x0[c,:], symmetric_proposal, n_samples, thinning_factor = thinning_factor, burn_in = burn_in)
 
         elif mcmc_method == 'metropolis_hastings_grad_E':
+            assert proposal_stddev > 0.0
             symmetric_proposal = lambda x: x + np.random.normal(size=x.shape, scale = proposal_stddev)
             (X, acceptance_ratio) = run_chain_with_energy(None, x0[c,:], symmetric_proposal, n_samples, thinning_factor = thinning_factor, burn_in = burn_in, grad_E = grad_E)
 
@@ -325,7 +327,10 @@ def mcmc_generate_samples(sampling_options):
 
             # grad_E is needed to define the perfect reconstruction function
             # E is used for the Metropolis-Hastings sampling
-            r = lambda x: x + langevin_lambda * grad_E(x)
+
+            # remember that we have a minus here because it's d log p(x) / dx
+            # which corresponds to - dE(x) / dx
+            r = lambda x: x - langevin_lambda * grad_E(x)
             (X, acceptance_ratio) = run_chain_with_langevin_proposals(x0[c,:], n_samples, langevin_lambda, E = E, thinning_factor = thinning_factor, burn_in = burn_in, r = r)
 
             #(X, acceptance_ratio) = metropolis_hastings_sampler.run_chain_with_energy(ninja_star_distribution.E, x0, None, n_samples, thinning_factor = thinning_factor, burn_in = burn_in, asymmetric_proposal = asymmetric_proposal)

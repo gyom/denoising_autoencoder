@@ -27,7 +27,7 @@ def cross_differences(true_samples, model_samples, f = lambda x: x**2):
 
 
 # helper function
-def pdf(true_samples, model_samples, stddev):
+def pdf_alternative(true_samples, model_samples, stddev):
     """
     true_samples of shape (N,d)
     model_samples of shape (M,d)
@@ -40,6 +40,29 @@ def pdf(true_samples, model_samples, stddev):
     (M,d) = model_samples.shape
 
     return 1 / np.sqrt(2*np.pi) / (stddev**d) * np.exp( - 0.5 * cross_differences(true_samples, model_samples) / stddev**2 ).mean(axis=1)
+
+
+# helper function
+def pdf(true_samples, model_samples, stddev):
+    """
+    true_samples of shape (N,d)
+    model_samples of shape (M,d)
+
+    Returns an array of (N,).
+    This function should be seen as a vectorial function.
+    """
+    assert true_samples.shape[1] == model_samples.shape[1]
+    (N,d) = true_samples.shape
+    (M,d) = model_samples.shape
+
+    # Double-vectoring doesn't buy much performance.
+    # Might as well to through the list iterating.
+    results = []
+    for n in np.arange(N):
+        results.append( 1 / np.sqrt(2*np.pi) / (stddev**d) * np.exp( - 0.5 * ((true_samples[n,:] - model_samples)**2).sum(axis=1) / stddev**2 ).sum() )
+
+    return np.concat(results)
+    #return 1 / np.sqrt(2*np.pi) / (stddev**d) * np.exp( - 0.5 * cross_differences(true_samples, model_samples) / stddev**2 ).mean(axis=1)
 
 
 # helper function

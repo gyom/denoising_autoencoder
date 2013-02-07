@@ -11,7 +11,7 @@ def usage():
 
 def main():
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hv", ["help", "n_samples=", "n_chains=", "thinning_factor=", "burn_in=", "langevin_lambda=", "mcmc_method=", "proposal_stddev=", "dataset=", "output_dir_prefix=", "reference_pickled_samples_for_KL=", "reference_stddev_for_KL="])
+        opts, args = getopt.getopt(sys.argv[1:], "hv", ["help", "omit_ninja_star_from_plots", "n_samples=", "n_chains=", "thinning_factor=", "burn_in=", "langevin_lambda=", "mcmc_method=", "proposal_stddev=", "dataset=", "output_dir_prefix=", "reference_pickled_samples_for_KL=", "reference_stddev_for_KL="])
     except getopt.GetoptError as err:
         # print help information and exit:
         print str(err) # will print something like "option -a not recognized"
@@ -65,6 +65,8 @@ def main():
             output_options['reference_pickled_samples_for_KL'] = a
         elif o in ("--reference_stddev_for_KL"):
             output_options['reference_stddev_for_KL'] = float(a)
+        elif o in ("--omit_ninja_star_from_plots"):
+            output_options['omit_ninja_star_from_plots'] = True
         else:
             assert False, "unhandled option"
 
@@ -127,16 +129,32 @@ def main():
     output_image_dir = "%s/%s/%d" % (output_options["output_dir_prefix"], sampling_options['mcmc_method'], int(time.time()) )
     os.makedirs(output_image_dir)
 
+    import cPickle
+    output_pkl_name = os.path.join(output_image_dir, "results_and_params.pkl")
+    f = open(output_pkl_name, "w")
+    cPickle.dump({'results':results, 'sampling_options':sampling_options, 'output_options':output_options}, f)
+    f.close()
+
     if len(results['samples'].shape) == 2:
     
         output_image_path = os.path.join(output_image_dir, "whole_chain.png")
-        plot_one_slice_of_ninja_star_samples(results['samples'], output_image_path, dpi=200)
-    
+        plot_one_slice_of_ninja_star_samples(results['samples'],
+                                             output_image_path,
+                                             dpi=200,
+                                             omit_ninja_star_from_plots = output_options.has_key('omit_ninja_star_from_plots'))
+
     elif len(results['samples'].shape) == 3:
 
+        #plot_one_slice_of_ninja_star_samples_2(results['samples'],
+        #                                     lambda n : os.path.join(output_image_dir, "frame_%0.6d.png" % n),
+        #                                     dpi=100)
+
         for n in np.arange(sampling_options['n_samples']):
-            output_image_path = os.path.join(output_image_dir, "frame_%0.6d.png" % n)
-            plot_one_slice_of_ninja_star_samples(results['samples'][:,n,:], output_image_path, dpi=100)
+               output_image_path = os.path.join(output_image_dir, "frame_%0.6d.png" % n)
+               plot_one_slice_of_ninja_star_samples(results['samples'][:,n,:],
+                                                 output_image_path,
+                                                 dpi=100,
+                                                 omit_ninja_star_from_plots = output_options.has_key('omit_ninja_star_from_plots'))
 
         import subprocess
         #export MOVIEDIR=${HOME}/Documents/tmp/metropolis_hastings_E/1359965409
@@ -146,9 +164,6 @@ def main():
     else:
         raise("Wrong shape for samples returned !")
     
-
-    
-
 
 
 
@@ -160,7 +175,7 @@ import pylab
 import matplotlib.pyplot as plt
 
 
-def plot_one_slice_of_ninja_star_samples(samples_slice, output_image_path, dpi=100):
+def plot_one_slice_of_ninja_star_samples(samples_slice, output_image_path, dpi=100, omit_ninja_star_from_plots = False):
     """
         Samples should be of size (M, d).
         You would generally pick either one chain alone
@@ -181,8 +196,37 @@ def plot_one_slice_of_ninja_star_samples(samples_slice, output_image_path, dpi=1
 
     # TODO : pick better color for the sample dots
     pylab.scatter(x, y)
+
     # TODO : stamp the KL divergence on the plots
 
+    M = 4.0
+    if not omit_ninja_star_from_plots:
+        print "Computing the original pdf values."
+
+        mesh_x,mesh_y = np.mgrid[-M:M:.01, -M:M:.01]
+        z = ninja_star_distribution.mesh_pdf(mesh_x, mesh_y)
+
+        print "Generating the nice plots."
+        model_pdf_values_plot_handle = plt.pcolor(mesh_x, mesh_y, z)
+        #plt.winter()
+        plt.pink()
+        #d = plt.colorbar(model_pdf_value_plot_handle, orientation='horizontal')
+
+    pylab.axes([-M, M, -M, M])
+    count_of_points_outside = np.count_nonzero( (x < M) + (M < x) + (y < M) + (M < y) )
+    pylab.text(0.0, 0.0,"%d points outside" % count_of_points_outside,fontsize=12, transform = pylab.gca().transAxes)
+
+    pylab.draw()
+    #pylab.savefig(output_image_path)
+    pylab.savefig(output_image_path, dpi=dpi)
+    pylab.close()
+
+
+def plot_one_slice_of_ninja_star_samples_2(samples, output_image_path_generator, dpi=100):
+
+    import ninja_star_distribution
+
+    pylab.hold(True)
 
     print "Computing the original pdf values."
     M = 4.0
@@ -195,11 +239,17 @@ def plot_one_slice_of_ninja_star_samples(samples_slice, output_image_path, dpi=1
     plt.pink()
     #d = plt.colorbar(model_pdf_value_plot_handle, orientation='horizontal')
 
-    pylab.draw()
-    #pylab.savefig(output_image_path)
-    pylab.savefig(output_image_path, dpi=dpi)
-    pylab.close()
+    for c in np.arange(samples.shape[0]):
+        x = samples[c,:,0]
+        y = samples[c,:,1]
+        scatter_handle = pylab.scatter(x, y)
 
+        pylab.draw()
+        pylab.savefig(output_image_path_generator(c), dpi=dpi)
+        print "Wrote " + output_image_path_generator(c)                                             
+        del(scatter_handle)
+
+    pylab.close()
 
 
 
