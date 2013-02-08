@@ -95,15 +95,26 @@ def main():
             c=c, b=b,
             s=s, act_func=['sigmoid', 'id'])
         reference_langevin_lambda = 0.4**2
+        #reference_langevin_lambda = 1.0
         # overwrite whichever langevin lambda was given as argument
         #sampling_options["langevin_lambda"] = reference_langevin_lambda
         r = lambda x: the_dae.encode_decode(x.reshape((-1,n_inputs))).reshape((n_inputs,))
         grad_E = lambda x: - (r(x) - x) / reference_langevin_lambda
         sampling_options["grad_E"] = grad_E
 
-        previous_samples = cPickle.load(open('/u/alaingui/Documents/tmp/Salah_DAE_2013_02_06_tmp/metropolis_hastings_langevin_grad_E/1360201931/samples.pkl'))
-        sampling_options["x0"] = previous_samples[-1,:]
+        # METHOD 1
+        mnist_dataset = cPickle.load(open('/data/lisa/data/mnist/mnist.pkl', 'rb'))
+        mnist_train = mnist_dataset[0]
+        mnist_train_data, mnist_train_labels = mnist_train
+        ind = np.random.randint(0, mnist_train_data.shape[0]-1)
+        sampling_options["x0"] = mnist_train_data[ind,:]
+        print "Starting the simulation from MNIST digit %d" % mnist_train_labels[ind]
+        # METHOD 2
+        #previous_samples = cPickle.load(open('/u/alaingui/Documents/tmp/Salah_DAE_2013_02_06_tmp/metropolis_hastings_langevin_grad_E/1360201931/samples.pkl'))
+        #sampling_options["x0"] = previous_samples[-1,:]
+        # METHOD 3
         #sampling_options["x0"] = np.random.uniform(low=0.0, high=1.0,size=(n_inputs,))
+
         # these are the only valid sampling methods because they rely only on grad_E
         assert sampling_options["mcmc_method"] in ["langevin", "metropolis_hastings_grad_E", "metropolis_hastings_langevin_grad_E"]
         
