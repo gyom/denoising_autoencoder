@@ -147,7 +147,6 @@ def KL(true_samples, model_samples, true_samples_Ntrain = None, true_samples_Nte
 
 ### a basic main function to be used ###
 
-
 def usage():
     print "-- usage example --"
 

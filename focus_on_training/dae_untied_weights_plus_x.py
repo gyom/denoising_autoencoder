@@ -63,7 +63,7 @@ class DAE_untied_weights_plus_x(DAE):
         self.reset_params()
         if not (Wc == None):
             self.Wc = Wc
-        if not (Wc == None):
+        if not (Wb == None):
             self.Wb = Wb
         if not (c == None):
             self.c = c

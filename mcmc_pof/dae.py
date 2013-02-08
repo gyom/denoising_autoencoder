@@ -64,6 +64,9 @@ class DAE(object):
             noisy_X: array-like, shape (n_examples, n_inputs)
         """
 
+        print X.shape
+        print noisy_X.shape
+
         def U(q):
             # because theano_loss is a vectorial function, we have to sum()
             return self.q_loss(q, X, noisy_X).sum()

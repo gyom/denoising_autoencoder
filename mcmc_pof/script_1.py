@@ -111,7 +111,7 @@ def main():
             else:
                 reference_stddev_for_KL = None
 
-            KL_value = KL_approximation.KL(reference_sample, results['samples'], 2000, 2000, stddev = reference_stddev_for_KL)
+            KL_value = KL_approximation.KL(reference_sample, results['samples'], 0.9, 0.1, stddev = reference_stddev_for_KL)
             print "We got a KL divergence value of %f" % KL_value
 
 

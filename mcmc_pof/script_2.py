@@ -52,7 +52,7 @@ def main():
             #             'metropolis_hastings_grad_E']:
             #    error("Bad name for mcmc_method.")
         elif o in ("--dataset_desc"):
-            if a in ['ninja_star', 'Salah_DAE']:
+            if a in ['ninja_star', 'Salah_DAE', 'guillaume_DAE']:
                 sampling_options["dataset_desc"] = a
             else:
                 "Unrecognized dataset."
@@ -78,7 +78,7 @@ def main():
 
         import cPickle
         salah_dae_params = cPickle.load(open('/data/lisatmp2/rifaisal/share/sm_dae/ae_std=0.4.pkl'))
-
+ 
         import dae_untied_weights
         n_inputs = 784
         n_hiddens = 1024
@@ -95,6 +95,48 @@ def main():
             c=c, b=b,
             s=s, act_func=['sigmoid', 'id'])
         reference_langevin_lambda = 0.4**2
+        # overwrite whichever langevin lambda was given as argument
+        #sampling_options["langevin_lambda"] = reference_langevin_lambda
+        r = lambda x: the_dae.encode_decode(x.reshape((-1,n_inputs))).reshape((n_inputs,))
+        grad_E = lambda x: - (r(x) - x) / reference_langevin_lambda
+        sampling_options["grad_E"] = grad_E
+ 
+        # METHOD 1
+        mnist_dataset = cPickle.load(open('/data/lisa/data/mnist/mnist.pkl', 'rb'))
+        mnist_train = mnist_dataset[0]
+        mnist_train_data, mnist_train_labels = mnist_train
+        ind = np.random.randint(0, mnist_train_data.shape[0]-1)
+        sampling_options["x0"] = mnist_train_data[ind,:]
+        print "Starting the simulation from MNIST digit %d" % mnist_train_labels[ind]
+        # METHOD 3
+        #sampling_options["x0"] = np.random.uniform(low=0.0, high=1.0,size=(n_inputs,))
+
+        # these are the only valid sampling methods because they rely only on grad_E
+        assert sampling_options["mcmc_method"] in ["langevin", "metropolis_hastings_grad_E", "metropolis_hastings_langevin_grad_E"]
+
+    elif sampling_options["dataset_desc"] == "guillaume_DAE":
+
+        import cPickle
+        guillaume_dae_params = cPickle.load(open("/u/alaingui/umontreal/denoising_autoencoder/mcmc_pof/trained_models/mydae_2013_02_07.pkl"))
+
+        import dae_untied_weights
+        n_inputs = 784
+        n_hiddens = 1024
+        Wc = guillaume_dae_params['Wc']
+        Wb = guillaume_dae_params['Wb']
+        c = guillaume_dae_params['c']
+        b = guillaume_dae_params['b']
+        s = guillaume_dae_params['s']
+        act_func = guillaume_dae_params['act_func']
+
+        the_dae = dae_untied_weights.DAE_untied_weights(
+            n_inputs=n_inputs,
+            n_hiddens=n_hiddens,
+            Wc=Wc, Wb=Wb,
+            c=c, b=b,
+            s=s, act_func=act_func)
+
+        reference_langevin_lambda = 0.001
         #reference_langevin_lambda = 1.0
         # overwrite whichever langevin lambda was given as argument
         #sampling_options["langevin_lambda"] = reference_langevin_lambda
@@ -109,9 +151,6 @@ def main():
         ind = np.random.randint(0, mnist_train_data.shape[0]-1)
         sampling_options["x0"] = mnist_train_data[ind,:]
         print "Starting the simulation from MNIST digit %d" % mnist_train_labels[ind]
-        # METHOD 2
-        #previous_samples = cPickle.load(open('/u/alaingui/Documents/tmp/Salah_DAE_2013_02_06_tmp/metropolis_hastings_langevin_grad_E/1360201931/samples.pkl'))
-        #sampling_options["x0"] = previous_samples[-1,:]
         # METHOD 3
         #sampling_options["x0"] = np.random.uniform(low=0.0, high=1.0,size=(n_inputs,))
 
@@ -154,7 +193,7 @@ def main():
     f.close()
     print "Wrote " + samples_only_pkl_name
 
-    if sampling_options["dataset_desc"] == "Salah_DAE":
+    if sampling_options["dataset_desc"] in ["Salah_DAE", "guillaume_DAE"]:
         digits_image_file = os.path.join(output_image_dir, "digits.png")
         plot_Salah_DAE_samples(results['samples'],  digits_image_file)
 
