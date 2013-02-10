@@ -14,18 +14,21 @@ mydae = DAE_untied_weights(n_inputs = 784,
                            n_hiddens = 1024,
                            act_func = ['tanh', 'sigmoid'])
 
+#mydae.fit_with_decreasing_noise(mnist_train_data[0:2000,:],
+#                                [0.1, 0.05, 0.01, 0.001],
+#                                {'method' : 'fmin_cg',
+#                                 'maxiter' : 500,
+#                                 'gtol':0.001})
+
+
 mydae.fit_with_decreasing_noise(mnist_train_data[0:2000,:],
-                                [0.1, 0.05, 0.01, 0.001],
-                                {'method' : 'fmin_cg',
+                                [0.1, 0.05, 0.01],
+                                {'method' : 'fmin_l_bfgs_b',
                                  'maxiter' : 500,
-                                 'gtol':0.001})
+                                 'm':25})
 
+print mydae.s
 
-mydae.fit_with_decreasing_noise(mnist_train_data[0:2000,:],
-                                [0.1, 0.05, 0.01, 0.001],
-                                {'method' : 'fmin_bfgs',
-                                 'maxiter' : 500})
-
-
+pkl_file = "/u/alaingui/umontreal/denoising_autoencoder/mcmc_pof/trained_models/mydae_2013_02_08.pkl"
 cPickle.dump({'Wc':mydae.Wc, 'Wb':mydae.Wb, 'b':mydae.b, 'c':mydae.c, 's':mydae.s, 'act_func':mydae.act_func},
-             open("/u/alaingui/umontreal/denoising_autoencoder/mcmc_pof/trained_models/mydae_2013_02_07.pkl", "w"))
+             open(pkl_file, "w"))

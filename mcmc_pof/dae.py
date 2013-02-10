@@ -36,16 +36,16 @@ class DAE(object):
 
 
     def q_read_params(self):
-        error("Abstract method")
+        raise("Abstract method")
 
     def q_set_params(self, q):
-        error("Abstract method")
+        raise("Abstract method")
 
     def q_grad(self, q, X, noisy_X):
-        error("Abstract method")
+        raise("Abstract method")
 
     def q_loss(self, q, X, noisy_X):
-        error("Abstract method")
+        raise("Abstract method")
 
 
 
@@ -104,15 +104,16 @@ class DAE(object):
             best_q = scipy.optimize.fmin_bfgs(U, q0, grad_U,
                                               callback = logging_callback,
                                               maxiter = optimization_args['maxiter'])
-            #elif optimization_args['method'] == 'fmin_l_bfgs_b':
-            #    # Cannot perform the logging.
-            #    best_q = scipy.optimize.fmin_l_bfgs_b(f, q0, fprime,
-            #                                          # m = optimization_args['m'],
-            #                                          maxfun = optimization_args['maxiter'])
+        elif optimization_args['method'] == 'fmin_l_bfgs_b':
+            # Cannot perform the logging.
+            (best_q, _, details) = scipy.optimize.fmin_l_bfgs_b(U, q0, grad_U,
+                                                                m = optimization_args['m'],
+                                                                maxfun = optimization_args['maxiter'])
         else:
-            error("Unrecognized method name : " + optimization_args['method'])
+            assert False, "Unrecognized method name : " + optimization_args['method']
 
         # Don't forget to set the params after you optimized them !
+        assert type(best_q) == np.ndarray
         self.q_set_params(best_q)
 
 

@@ -72,11 +72,11 @@ class DAE_untied_weights(DAE):
             self.s = s
 
         if len(act_func) != 2:
-            error("Need to specify two activation functions from : ['tanh', 'sigmoid', 'id'].")
+            raise("Need to specify two activation functions from : ['tanh', 'sigmoid', 'id'].")
         else:
             for f in act_func:
                 if not f in ['tanh', 'sigmoid', 'id']:
-                    error("Unrecognized activation function. Should be from : ['tanh', 'sigmoid', 'id'].")
+                    raise("Unrecognized activation function. Should be from : ['tanh', 'sigmoid', 'id'].")
             if act_func[0] == 'id':
                 print "It's a bad idea to use the identity as first activation function. \nMaybe you got the ordering mixed up ?"
         self.act_func = act_func
@@ -110,7 +110,7 @@ class DAE_untied_weights(DAE):
             # bad idae
             h = h_act
         else:
-            error("Invalid act_func[0]")
+            raise("Invalid act_func[0]")
 
         r_act = T.dot(h, Wb.T) + b
         if self.act_func[1] == 'tanh':
@@ -120,7 +120,7 @@ class DAE_untied_weights(DAE):
         elif self.act_func[1] == 'id':
             r = s * r_act
         else:
-            error("Invalid act_func[1]")
+            raise("Invalid act_func[1]")
 
         if self.want_plus_x:
             r = r + x
@@ -153,17 +153,17 @@ class DAE_untied_weights(DAE):
 
     def encode(self, X):
         if X.shape[1] != self.n_inputs:
-            error("Using wrong shape[1] for the argument X to DAE.encode. It's %d when it should be %d" % (X.shape[1], self.n_inputs))
+            raise("Using wrong shape[1] for the argument X to DAE.encode. It's %d when it should be %d" % (X.shape[1], self.n_inputs))
         return self.theano_encode(self.Wc, self.c, X)
 
     def decode(self, H):
         if H.shape[1] != self.n_hiddens:
-            error("Using wrong shape[1] for the argument H to DAE.decode. It's %d when it should be %d" % (H.shape[1], self.n_hiddens))
+            raise("Using wrong shape[1] for the argument H to DAE.decode. It's %d when it should be %d" % (H.shape[1], self.n_hiddens))
         return self.theano_decode(self.Wb, self.b, self.s, H)
 
     def encode_decode(self, X):
         if X.shape[1] != self.n_inputs:
-            error("Using wrong shape[1] for the argument X to DAE.encode_decode. It's %d when it should be %d" % (X.shape[1], self.n_inputs))
+            raise("Using wrong shape[1] for the argument X to DAE.encode_decode. It's %d when it should be %d" % (X.shape[1], self.n_inputs))
 
         #print self.Wb.shape
         #print self.Wc.shape

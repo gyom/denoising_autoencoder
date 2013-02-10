@@ -117,7 +117,8 @@ def main():
     elif sampling_options["dataset_desc"] == "guillaume_DAE":
 
         import cPickle
-        guillaume_dae_params = cPickle.load(open("/u/alaingui/umontreal/denoising_autoencoder/mcmc_pof/trained_models/mydae_2013_02_07.pkl"))
+        #guillaume_dae_params = cPickle.load(open("/u/alaingui/umontreal/denoising_autoencoder/mcmc_pof/trained_models/mydae_2013_02_07.pkl"))
+        guillaume_dae_params = cPickle.load(open("/u/alaingui/umontreal/denoising_autoencoder/mcmc_pof/trained_models/mydae_2013_02_08.pkl"))
 
         import dae_untied_weights
         n_inputs = 784
@@ -136,7 +137,7 @@ def main():
             c=c, b=b,
             s=s, act_func=act_func)
 
-        reference_langevin_lambda = 0.001
+        reference_langevin_lambda = 0.01
         #reference_langevin_lambda = 1.0
         # overwrite whichever langevin lambda was given as argument
         #sampling_options["langevin_lambda"] = reference_langevin_lambda
