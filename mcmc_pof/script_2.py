@@ -71,8 +71,21 @@ def main():
         if not sampling_options["n_chains"] == None:
             sampling_options["x0"] = np.random.normal(size=(sampling_options["n_chains"],2))
         else:
+            sampling_options["x0"] = np.random.normal(size=(2,))
+
+        # this field should be obsolete
+        #output_options["cross_entropy_function"] = ninja_star_distribution.cross_entropy
+
+    elif sampling_options["dataset_desc"] == "butterfly":
+
+        import butterfly_distribution
+        sampling_options["E"] = butterfly_distribution.E
+        sampling_options["grad_E"] = butterfly_distribution.grad_E
+
+        if not sampling_options["n_chains"] == None:
+            sampling_options["x0"] = np.random.normal(size=(sampling_options["n_chains"],2))
+        else:
             sampling_options["x0"] = np.random.normal(size=(2,))        
-        output_options["cross_entropy_function"] = ninja_star_distribution.cross_entropy
 
     elif sampling_options["dataset_desc"] == "Salah_DAE":
 

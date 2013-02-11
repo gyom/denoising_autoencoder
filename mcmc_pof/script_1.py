@@ -57,6 +57,11 @@ def main():
                 sampling_options["dataset_description"] = "ninja_star"
                 sampling_options["E"] = ninja_star_distribution.E
                 sampling_options["grad_E"] = ninja_star_distribution.grad_E
+            if a == 'butterfly':
+                import butterfly_distribution
+                sampling_options["dataset_description"] = "butterfly"
+                sampling_options["E"] = butterfly_distribution.E
+                sampling_options["grad_E"] = butterfly_distribution.grad_E
             else:
                 "Unrecognized dataset."
         elif o in ("--output_dir_prefix"):
@@ -76,7 +81,14 @@ def main():
         else:
             sampling_options["x0"] = np.random.normal(size=(2,))
         
-        output_options["cross_entropy_function"] = ninja_star_distribution.cross_entropy
+        # osbsolete
+        #output_options["cross_entropy_function"] = ninja_star_distribution.cross_entropy
+
+    elif sampling_options["dataset_description"] == "butterfly":
+        if not sampling_options["n_chains"] == None:
+            sampling_options["x0"] = np.random.normal(size=(sampling_options["n_chains"],2))
+        else:
+            sampling_options["x0"] = np.random.normal(size=(2,))
     else:
         error("No dataset was supplied.")
 
@@ -115,56 +127,58 @@ def main():
             print "We got a KL divergence value of %f" % KL_value
 
 
-    #if len(results['samples'].shape) == 2:
-    #    cross_entropy = output_options['cross_entropy_function'](results['samples'])
-    #    print "The cross-entropy of the samples is %f. Smaller values are best." % cross_entropy
-    #elif len(results['samples'].shape) == 3:
-    #    cross_entropy = output_options['cross_entropy_function'](results['samples'][:,-1,:])
-    #    print "The cross-entropy of the samples for all chains at the last time step is %f. Smaller values are best." % cross_entropy
-    #else:
-    #    raise("Wrong shape for samples returned !")
-    
-    # TODO : Have that directory be specified as an argument.
-    #output_image_dir = "/u/alaingui/Documents/tmp/%s/%d" % ( sampling_options['mcmc_method'], int(time.time()) )
     output_image_dir = "%s/%s/%d" % (output_options["output_dir_prefix"], sampling_options['mcmc_method'], int(time.time()) )
     os.makedirs(output_image_dir)
 
     import cPickle
     output_pkl_name = os.path.join(output_image_dir, "results_and_params.pkl")
     f = open(output_pkl_name, "w")
+    if sampling_options.has_key("grad_E"):
+        sampling_options["grad_E"] = "CANNOT BE PICKLED"
     cPickle.dump({'results':results, 'sampling_options':sampling_options, 'output_options':output_options}, f)
     f.close()
+    print "Wrote " + output_pkl_name
 
-    if len(results['samples'].shape) == 2:
+
+    samples_only_pkl_name = os.path.join(output_image_dir, "samples.pkl")
+    f = open(samples_only_pkl_name, "w")
+    cPickle.dump(results['samples'], f)
+    f.close()
+    print "Wrote " + samples_only_pkl_name
+
+
+    if sampling_options["dataset_description"] == "ninja_star":
+
+        if len(results['samples'].shape) == 2:
     
-        output_image_path = os.path.join(output_image_dir, "whole_chain.png")
-        plot_one_slice_of_ninja_star_samples(results['samples'],
-                                             output_image_path,
-                                             dpi=200,
-                                             omit_ninja_star_from_plots = output_options.has_key('omit_ninja_star_from_plots'))
-
-    elif len(results['samples'].shape) == 3:
-
-        #plot_one_slice_of_ninja_star_samples_2(results['samples'],
-        #                                     lambda n : os.path.join(output_image_dir, "frame_%0.6d.png" % n),
-        #                                     dpi=100)
-
-        for n in np.arange(sampling_options['n_samples']):
-               output_image_path = os.path.join(output_image_dir, "frame_%0.6d.png" % n)
-               plot_one_slice_of_ninja_star_samples(results['samples'][:,n,:],
+            output_image_path = os.path.join(output_image_dir, "whole_chain.png")
+            plot_one_slice_of_ninja_star_samples(results['samples'],
                                                  output_image_path,
-                                                 dpi=100,
+                                                 dpi=200,
                                                  omit_ninja_star_from_plots = output_options.has_key('omit_ninja_star_from_plots'))
 
-        import subprocess
-        #export MOVIEDIR=${HOME}/Documents/tmp/metropolis_hastings_E/1359965409
-        #ffmpeg -i ${MOVIEDIR}/frame_%06d.png -vcodec libx264 -vpre hq -crf 22 -r 10 ${MOVIEDIR}/seq.mp4
-        subprocess.check_output(["ffmpeg", "-i", output_image_dir + r"/frame_%06d.png", "-y", "-vcodec", "libx264", "-vpre", "hq", "-crf", "22", "-r", "10", output_image_dir + r"/assembled.mp4"])
-        print "Generated movie at %s." % (output_image_dir + r"/assembled.mp4", )
-    else:
-        raise("Wrong shape for samples returned !")
-    
+        elif len(results['samples'].shape) == 3:
 
+            #plot_one_slice_of_ninja_star_samples_2(results['samples'],
+            #                                     lambda n : os.path.join(output_image_dir, "frame_%0.6d.png" % n),
+            #                                     dpi=100)
+
+            for n in np.arange(sampling_options['n_samples']):
+                output_image_path = os.path.join(output_image_dir, "frame_%0.6d.png" % n)
+                plot_one_slice_of_ninja_star_samples(results['samples'][:,n,:],
+                                                     output_image_path,
+                                                     dpi=100,
+                                                     omit_ninja_star_from_plots = output_options.has_key('omit_ninja_star_from_plots'))
+
+                import subprocess
+                #export MOVIEDIR=${HOME}/Documents/tmp/metropolis_hastings_E/1359965409
+                #ffmpeg -i ${MOVIEDIR}/frame_%06d.png -vcodec libx264 -vpre hq -crf 22 -r 10 ${MOVIEDIR}/seq.mp4
+                subprocess.check_output(["ffmpeg", "-i", output_image_dir + r"/frame_%06d.png", "-y", "-vcodec", "libx264", "-vpre", "hq", "-crf", "22", "-r", "10", output_image_dir + r"/assembled.mp4"])
+
+            print "Generated movie at %s." % (output_image_dir + r"/assembled.mp4", )
+        else:
+            raise("Wrong shape for samples returned !")
+    
 
 
 # We'll put the imports here just in case the

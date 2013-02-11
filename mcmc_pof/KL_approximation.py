@@ -48,7 +48,7 @@ def pdf(true_samples, model_samples, stddev):
     true_samples of shape (N,d)
     model_samples of shape (M,d)
 
-    Returns an array of (N,M).
+    Returns an array of (N,).
     This function should be seen as a vectorial function.
     """
     assert true_samples.shape[1] == model_samples.shape[1]
@@ -59,14 +59,19 @@ def pdf(true_samples, model_samples, stddev):
     # Might as well to through the list iterating.
     results = []
     for n in np.arange(N):
-        results.append( 1 / np.sqrt(2*np.pi) / (stddev**d) * np.exp( - 0.5 * ((true_samples[n,:] - model_samples)**2).sum(axis=1) / stddev**2 ) )
-
+        results.append( 1 / np.sqrt(2*np.pi) / (stddev**d) * np.exp( - 0.5 * ((true_samples[n,:] - model_samples)**2).sum(axis=1) / stddev**2 ).mean() )
+        # This was 
+        #    results.append( 1 / np.sqrt(2*np.pi) / (stddev**d) * np.exp( - 0.5 * ((true_samples[n,:] - model_samples)**2).sum(axis=1) / stddev**2 ) )
+        # before, but the returned results were (N,M) which was
+        # too much memory consumption.
     return np.vstack(results)
-    #return 1 / np.sqrt(2*np.pi) / (stddev**d) * np.exp( - 0.5 * cross_differences(true_samples, model_samples) / stddev**2 ).mean(axis=1)
 
 
 def cross_entropy(true_samples, model_samples, stddev):
-    return - np.log( pdf(true_samples, model_samples, stddev).mean(axis=1) ).mean()
+    # Was
+    #    return - np.log( pdf(true_samples, model_samples, stddev).mean(axis=1) ).mean()
+    # with the old implementation of pdf that returned an nd.array of shape (N,M).
+    return - np.log( pdf(true_samples, model_samples, stddev) ).mean()
 
 
 # helper function
@@ -136,8 +141,8 @@ def KL(true_samples, model_samples, true_samples_Ntrain = None, true_samples_Nte
     #KL_divergence = (   np.log(pdf(true_samples[ind[0:true_samples_Ntest],:], true_samples[ind[0:true_samples_Ntest],:], stddev)).mean()
     #                  - np.log(pdf(true_samples[ind[0:true_samples_Ntest],:], model_samples,                             stddev)).mean() )
 
-    KL_divergence = ( - cross_entropy( true_samples[ind[0:true_samples_Ntest],:], true_samples[ind[0:true_samples_Ntest],:], stddev)
-                      + cross_entropy( true_samples[ind[0:true_samples_Ntest],:], model_samples,                             stddev) )
+    KL_divergence = ( - cross_entropy( true_samples[ind[true_samples_Ntrain:(true_samples_Ntrain+true_samples_Ntest)],:], true_samples[ind[true_samples_Ntrain:(true_samples_Ntrain+true_samples_Ntest)],:], stddev)
+                      + cross_entropy( true_samples[ind[true_samples_Ntrain:(true_samples_Ntrain+true_samples_Ntest)],:], model_samples,                             stddev) )
 
 
     return KL_divergence
@@ -177,8 +182,8 @@ def main():
 
     p_samples_pkl = None
     q_samples_pkl = None
-    p_Ntrain = None
-    q_Ntrain = None
+    p_Ntrain = 0.5
+    p_Ntest = 0.5
     stddev = None
 
     verbose = False
@@ -208,9 +213,15 @@ def main():
     import cPickle
     p_samples = cPickle.load(open(p_samples_pkl))
     q_samples = cPickle.load(open(q_samples_pkl))
+    
+    # listing more stddev
+    for stddev in np.exp(np.linspace(0, -5, 20)):
+        KL_value = KL(p_samples, q_samples, p_Ntrain, p_Ntest, stddev)
+        print "stddev %f gives KL_value %f" % (stddev, KL_value)
 
-    KL_value = KL(p_samples, q_samples, p_Ntrain, p_Ntest, stddev)
-    print KL_value
+    # regular way
+    #KL_value = KL(p_samples, q_samples, p_Ntrain, p_Ntest, stddev)
+    #print KL_value
 
 
 if __name__ == "__main__":
