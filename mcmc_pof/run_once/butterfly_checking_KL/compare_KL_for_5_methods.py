@@ -13,7 +13,7 @@ methods = ["metropolis_hastings_E",
 
 for method in methods:
 
-    file = os.path.join("/u/alaingui/umontreal/denoising_autoencoder/mcmc_pof/junk", "2013_02_10_KL_measurements_butterfly_%s.txt" % (method,))
+    file = os.path.join("/u/alaingui/umontreal/denoising_autoencoder/mcmc_pof/run_once/butterfly_checking_KL", "2013_02_12_KL_measurements_butterfly_%s.txt" % (method,))
     assert os.path.exists(file)
 
     KL_values[method] = []

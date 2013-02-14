@@ -75,12 +75,11 @@ def cross_entropy(true_samples, model_samples, stddev):
 
 
 # helper function
-def fit_stddev(true_samples, model_samples, initial_stddev):
+def fit_stddev_halving(true_samples, model_samples, initial_stddev):
     """
     Some kind of bisection search towards zero.
     Divide the stddev until you stop decreasing the likelihood.
     """
-
     current_stddev = initial_stddev
     current_loglik = - cross_entropy(true_samples, model_samples, current_stddev)
 
@@ -101,8 +100,30 @@ def fit_stddev(true_samples, model_samples, initial_stddev):
     return current_stddev
 
 
+
+def fit_stddev_enumeration(true_samples, model_samples, stddev_array, verbose=False):
+    """
+    Some kind of bisection search towards zero.
+    Divide the stddev until you stop decreasing the likelihood.
+    """
+
+    assert type(stddev_array) in [np.ndarray, type([])]
+
+    N = len(stddev_array)
+    logliks = np.ones((N,))* (-np.inf)
+    for n in np.arange(N):
+        logliks[n] = - cross_entropy(true_samples, model_samples, stddev_array[n])
+        if verbose:
+            print "stddev %f gives loglik %f" % (stddev_array[n], logliks[n])
+        if logliks[n] == -np.inf:
+            break
+
+    return stddev_array[np.argmax(logliks)]
+
+
+
 # main function provided by this module
-def KL(true_samples, model_samples, true_samples_Ntrain = None, true_samples_Ntest = None, stddev = None):
+def KL(true_samples, model_samples, true_samples_Ntrain = None, true_samples_Ntest = None, true_stddev = None, model_stddev = None, verbose = False):
 
     assert type(true_samples) == np.ndarray
     assert type(model_samples) == np.ndarray
@@ -128,9 +149,24 @@ def KL(true_samples, model_samples, true_samples_Ntrain = None, true_samples_Nte
     ind = np.arange(0,true_samples.shape[0])
     np.random.shuffle(ind)
 
-    if stddev == None:
-        # train the stddev
-        stddev = fit_stddev(true_samples[ind[0:true_samples_Ntrain],:], model_samples, 1.0)
+    if true_stddev == None:
+        true_stddev = fit_stddev_enumeration(true_samples[ind[0:int(true_samples_Ntrain/2)],:],
+                                             true_samples[ind[int(true_samples_Ntrain/2):true_samples_Ntrain],:],
+                                             np.exp(np.linspace(0.0, -8.0, 20)),
+                                             verbose)
+        print "Using true_stddev = %f as found by optimization" % true_stddev
+    else:
+        print "Using true_stddev = %f given by parameter." % true_stddev
+
+    if model_stddev == None:
+        model_stddev = fit_stddev_enumeration(true_samples[ind[0:true_samples_Ntrain],:],
+                                            model_samples,
+                                            np.exp(np.linspace(0.0, -8.0, 20)),
+                                            verbose)
+        print "Using model_stddev = %f as found by optimization" % model_stddev
+    else:
+        print "Using model_stddev = %f given by parameter." % model_stddev
+
 
     # Now compute the KL divergence approximation.
     # One might argue that the true_samples used to train
@@ -141,8 +177,8 @@ def KL(true_samples, model_samples, true_samples_Ntrain = None, true_samples_Nte
     #KL_divergence = (   np.log(pdf(true_samples[ind[0:true_samples_Ntest],:], true_samples[ind[0:true_samples_Ntest],:], stddev)).mean()
     #                  - np.log(pdf(true_samples[ind[0:true_samples_Ntest],:], model_samples,                             stddev)).mean() )
 
-    KL_divergence = ( - cross_entropy( true_samples[ind[true_samples_Ntrain:(true_samples_Ntrain+true_samples_Ntest)],:], true_samples[ind[true_samples_Ntrain:(true_samples_Ntrain+true_samples_Ntest)],:], stddev)
-                      + cross_entropy( true_samples[ind[true_samples_Ntrain:(true_samples_Ntrain+true_samples_Ntest)],:], model_samples,                             stddev) )
+    KL_divergence = ( - cross_entropy( true_samples[ind[true_samples_Ntrain:(true_samples_Ntrain+true_samples_Ntest)],:], true_samples[ind[true_samples_Ntrain:(true_samples_Ntrain+true_samples_Ntest)],:], true_stddev)
+                      + cross_entropy( true_samples[ind[true_samples_Ntrain:(true_samples_Ntrain+true_samples_Ntest)],:], model_samples,                             model_stddev) )
 
 
     return KL_divergence
@@ -173,7 +209,7 @@ def main():
     import os, sys, getopt
     
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hv", ["help", "p_samples_pkl=", "q_samples_pkl=", "stddev=", "p_Ntrain=", "p_Ntest="])
+        opts, args = getopt.getopt(sys.argv[1:], "hv", ["help", "p_samples_pkl=", "q_samples_pkl=", "p_stddev=", "q_stddev=", "p_Ntrain=", "p_Ntest="])
     except getopt.GetoptError as err:
         # print help information and exit:
         print str(err) # will print something like "option -a not recognized"
@@ -184,7 +220,8 @@ def main():
     q_samples_pkl = None
     p_Ntrain = 0.5
     p_Ntest = 0.5
-    stddev = None
+    p_stddev = None
+    q_stddev = None
 
     verbose = False
     for o, a in opts:
@@ -204,6 +241,10 @@ def main():
             p_Ntrain = int(a)
         elif o in ("--p_Ntest"):
             p_Ntest = int(a)
+        elif o in ("--p_stddev"):
+            p_stddev = float(a)
+        elif o in ("--q_stddev"):
+            q_stddev = float(a)
         else:
             assert False, "unhandled option"
 
@@ -215,13 +256,8 @@ def main():
     q_samples = cPickle.load(open(q_samples_pkl))
     
     # listing more stddev
-    for stddev in np.exp(np.linspace(0, -5, 20)):
-        KL_value = KL(p_samples, q_samples, p_Ntrain, p_Ntest, stddev)
-        print "stddev %f gives KL_value %f" % (stddev, KL_value)
-
-    # regular way
-    #KL_value = KL(p_samples, q_samples, p_Ntrain, p_Ntest, stddev)
-    #print KL_value
+    KL_value = KL(p_samples, q_samples, p_Ntrain, p_Ntest, p_stddev, q_stddev, verbose)
+    print KL_value
 
 
 if __name__ == "__main__":

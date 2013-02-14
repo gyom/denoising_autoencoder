@@ -11,7 +11,7 @@ def usage():
 
 def main():
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hv", ["help", "omit_ninja_star_from_plots", "n_samples=", "n_chains=", "thinning_factor=", "burn_in=", "langevin_lambda=", "mcmc_method=", "proposal_stddev=", "dataset=", "output_dir_prefix=", "reference_pickled_samples_for_KL=", "reference_stddev_for_KL="])
+        opts, args = getopt.getopt(sys.argv[1:], "hv", ["help", "omit_ninja_star_from_plots", "n_samples=", "n_chains=", "thinning_factor=", "burn_in=", "langevin_lambda=", "mcmc_method=", "proposal_stddev=", "dataset=", "output_dir_prefix=", "reference_pickled_samples_for_KL=", "reference_stddev_for_KL=", "no_plots"])
     except getopt.GetoptError as err:
         # print help information and exit:
         print str(err) # will print something like "option -a not recognized"
@@ -20,6 +20,7 @@ def main():
 
     sampling_options = {}
     sampling_options["n_chains"] = None
+    sampling_options["no_plots"] = False
 
     output_options = {}
 
@@ -31,6 +32,8 @@ def main():
         elif o in ("-h", "--help"):
             usage()
             sys.exit()
+        if o == "--no_plots":
+            sampling_options["no_plots"] = True
         elif o in ("--n_samples"):
             sampling_options["n_samples"] = int(a)
         elif o in ("--thinning_factor"):
@@ -118,12 +121,13 @@ def main():
             f = open(output_options["reference_pickled_samples_for_KL"])
             reference_sample = cPickle.load(f)
 
-            if output_options.has_key("reference_stddev_for_KL"):
-                reference_stddev_for_KL = output_options["reference_stddev_for_KL"]
-            else:
-                reference_stddev_for_KL = None
+            # Let's leave out that argument for now.
+            #if output_options.has_key("reference_stddev_for_KL"):
+            #    reference_stddev_for_KL = output_options["reference_stddev_for_KL"]
+            #else:
+            #    reference_stddev_for_KL = None
 
-            KL_value = KL_approximation.KL(reference_sample, results['samples'], 0.9, 0.1, stddev = reference_stddev_for_KL)
+            KL_value = KL_approximation.KL(reference_sample, results['samples'], 0.5, 0.5)
             print "We got a KL divergence value of %f" % KL_value
 
 
@@ -147,7 +151,7 @@ def main():
     print "Wrote " + samples_only_pkl_name
 
 
-    if sampling_options["dataset_description"] == "ninja_star":
+    if sampling_options["dataset_description"] == "ninja_star" and not (sampling_options["no_plots"]):
 
         if len(results['samples'].shape) == 2:
     

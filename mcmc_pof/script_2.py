@@ -150,13 +150,22 @@ def main():
             c=c, b=b,
             s=s, act_func=act_func)
 
+        # Set to be like that because it's the value used to train
+        # the DAE originally. We've already got the pkl file hardcoded
+        # with the DAE parameters, so we might as well supply the lambda here.
         reference_langevin_lambda = 0.01
-        #reference_langevin_lambda = 1.0
-        # overwrite whichever langevin lambda was given as argument
         #sampling_options["langevin_lambda"] = reference_langevin_lambda
-        r = lambda x: the_dae.encode_decode(x.reshape((-1,n_inputs))).reshape((n_inputs,))
+
+        r = lambda X: the_dae.encode_decode(X.reshape((-1,n_inputs))).reshape((n_inputs,))
+        r_prime = lambda x: the_dae.jacobian_encode_decode(x)
+        f = lambda X: the_dae.encode(X.reshape((-1,n_inputs))).reshape((n_hiddens,))
+        f_prime = lambda x: the_dae.jacobian_encode(x)
         grad_E = lambda x: - (r(x) - x) / reference_langevin_lambda
         sampling_options["grad_E"] = grad_E
+        sampling_options["r"] = r
+        sampling_options["r_prime"] = r_prime
+        sampling_options["f"] = f
+        sampling_options["f_prime"] = f_prime
 
         # METHOD 1
         mnist_dataset = cPickle.load(open('/data/lisa/data/mnist/mnist.pkl', 'rb'))
@@ -169,7 +178,10 @@ def main():
         #sampling_options["x0"] = np.random.uniform(low=0.0, high=1.0,size=(n_inputs,))
 
         # these are the only valid sampling methods because they rely only on grad_E
-        assert sampling_options["mcmc_method"] in ["langevin", "metropolis_hastings_grad_E", "metropolis_hastings_langevin_grad_E"]
+        assert sampling_options["mcmc_method"] in ["langevin",
+                                                   "metropolis_hastings_grad_E",
+                                                   "metropolis_hastings_langevin_grad_E",
+                                                   "metropolis_hastings_svd_grad_E"]
         
 
     else:
@@ -194,8 +206,9 @@ def main():
 
     import cPickle
     output_pkl_name = os.path.join(output_image_dir, "results_and_params.pkl")
-    if sampling_options.has_key("grad_E"):
-        sampling_options["grad_E"] = "CANNOT BE PICKLED"
+    for key in ["grad_E", "f", "f_prime", "r", "r_prime"]:
+        if sampling_options.has_key(key):
+            sampling_options[key] = "CANNOT BE PICKLED"
     f = open(output_pkl_name, "w")
     cPickle.dump({'results':results, 'sampling_options':sampling_options, 'output_options':output_options}, f)
     f.close()

@@ -1,6 +1,7 @@
 
 import numpy as np
 import time
+import scipy
 
 def run_chain_with_energy(E, x0, symmetric_proposal, N, thinning_factor = 1, burn_in = 0, grad_E = None, asymmetric_proposal = None):
     """
@@ -253,6 +254,185 @@ def run_chain_with_langevin_proposals(x0, N, langevin_lambda, E = None, grad_E =
     return (samples, acceptance_ratio)
 
 
+
+
+
+
+
+def run_chain_with_SVD(x0, N, thinning_factor = 1, burn_in = 0,
+                       E = None, grad_E = None,
+                       r = None, r_prime = None, f_prime = None,
+                       proposal_stddev = 1.0, accept_all_proposals = False):
+    """
+        f        g
+    X -----> H -----> X
+
+    dim(X) = m
+    dim(H) = n
+    r = g * f
+
+    In this implementation, we use the following shapes for the arguments.
+    r       : R^m -> R^n
+    r_prime : R^m -> R^m
+    f_prime : R^m -> R^n
+    """
+
+    assert len(x0.shape) == 1, "Wrong dimension for x0."
+    assert f_prime
+    assert r
+    assert thinning_factor >= 1, "You misunderstood the thinning_factor. It should be 1 for no thinning, and 32 if we want one out of every 32 samples."
+
+    def approximate_energy_difference(proposed_x, current_x):
+        return grad_E(current_x).dot(proposed_x - current_x)
+
+    def exact_energy_difference(proposed_x, current_x):
+        return E(proposed_x) - E(current_x)
+
+    def zero_energy_difference(proposed_x, current_x):
+        return 0.0
+
+    if not E == None:
+        # This would be the regular branch executed when
+        # using Monte Carlo.
+        energy_difference = exact_energy_difference
+    elif E == None and not grad_E == None:
+        energy_difference = approximate_energy_difference
+    else:
+        raise("Unrecognized setup.")
+
+    if r_prime == None:
+        r_prime = make_numerical_derivative_function(r)
+
+
+    def proposal(x_t, previous_time_data = None):
+        """
+        A lot of quantities have to be carried over from the
+        previous iteration. We'll use "tm1" to refer to "t minus 1"
+        the previous iteration.
+        """
+
+        if not (previous_time_data == None):
+            x_tm1 = previous_time_data['x']
+            noisy_x_tm1 = previous_time_data['noisy_x']
+            logdet_r_prime_noisy_x_tm1 = previous_time_data['logdet_r_prime_noisy_x']
+            diagD_tm1 = previous_time_data['diagD']
+            Vh_tm1 = previous_time_data['Vh']
+            # those two could be recomputed
+            inversecov_tm1 = previous_time_data['inversecov']
+            logdetcov_tm1 = previous_time_data['logdetcov']
+
+
+        J_t = f_prime(x_t)
+
+        z = np.random.normal(size=J_t.shape[0])
+        #print J_t.shape
+        #print z.shape
+        noisy_x_t = x_t + proposal_stddev * J_t.T.dot(z)
+
+        (_, diagD_t, Vh_t) = scipy.linalg.svd(J_t)
+        inversecov_t = Vh_t.dot(np.diag(1/(proposal_stddev*diagD_t)**2)).dot(Vh_t.T)
+        logdetcov_t = 2*np.log(proposal_stddev*diagD_t).sum()
+
+        x_star = r(x_t)
+        logdet_r_prime_noisy_x_t = np.log(scipy.linalg.det(r_prime(noisy_x_t)))
+
+        current_time_data = {}
+        current_time_data['x'] = x_t
+        current_time_data['noisy_x'] = noisy_x_t
+        current_time_data['logdet_r_prime_noisy_x'] = logdet_r_prime_noisy_x_t
+        current_time_data['diagD'] = diagD_t
+        current_time_data['Vh'] = Vh_t
+        current_time_data['inversecov'] = inversecov_t
+        current_time_data['logdetcov'] = logdetcov_t
+
+        # If we're at the first iteration, we don't care
+        # much about the accept / reject because we don't
+        # have a pre-image for x_t.
+        if previous_time_data == None:
+            return (x_star, 0.0, current_time_data)
+        else:
+            log_q_proposal = 0.5 * (noisy_x_t - x_t).T.dot(inversecov_t).dot(noisy_x_t - x_t) - logdetcov_t - logdet_r_prime_noisy_x_t
+            log_q_reverse = 0.5 * (noisy_x_tm1 - x_star).T.dot(inversecov_tm1).dot(noisy_x_tm1 - x_star) - logdetcov_tm1 - logdet_r_prime_noisy_x_tm1
+
+            # We want to return
+            #    log q( current_x | proposed_x ) - log q( proposed_x | current_x )
+            # which is the quantity of interest to adjust the acceptance ratio.
+            asymmetric_correction_log_factor = log_q_reverse - log_q_proposal
+
+            return (x_star, asymmetric_correction_log_factor, current_time_data)
+    # end of proposal function
+
+    def iterate_N_times(current_x, previous_time_data, energy_difference, N):
+        for _ in np.arange(N):
+            (proposed_x, asymmetric_correction_log_factor, current_time_data) = proposal(current_x, previous_time_data)
+
+            loga = - energy_difference(proposed_x, current_x) + asymmetric_correction_log_factor
+            if accept_all_proposals or loga >= 0 or loga >= np.log(np.random.uniform(0,1)):
+                # accepted !
+                current_x = proposed_x
+                previous_time_data = current_time_data
+                iterate_N_times.accepted_counter += 1
+            else:
+                iterate_N_times.rejected_counter += 1
+
+        return (current_x, previous_time_data)
+
+    iterate_N_times.accepted_counter = 0
+    iterate_N_times.rejected_counter = 0
+
+
+    # Start with the burn-in iterations.
+    current_x = x0
+    (current_x, previous_time_data) = iterate_N_times(current_x, None, energy_difference, burn_in)
+
+    # Then we can think about collecting samples.
+    samples_list = []
+    # Start from the 'current_x' from the burn_in
+    # and not from x0. Reset the acceptance counters.
+    iterate_N_times.accepted_counter = 0
+    iterate_N_times.rejected_counter = 0
+
+
+    for n in np.arange(0,N):
+        (current_x, previous_time_data) = iterate_N_times(current_x, previous_time_data, energy_difference, thinning_factor)
+        # collect sample after running through the thinning iterations
+        samples_list.append(current_x)
+
+
+    samples = np.vstack(samples_list)
+    acceptance_ratio = iterate_N_times.accepted_counter * 1.0 / (iterate_N_times.accepted_counter + iterate_N_times.rejected_counter)
+
+    return (samples, acceptance_ratio)
+
+
+
+
+def make_numerical_derivative_function(f):
+    """
+    Takes a function of one argument x of shape (D,).
+
+    Returns function that returns the (D, D) matrix of derivatives at x,
+    where the first dimension runs along the output coordinates
+    and the second dimension runs along the input variables.
+
+    That is,
+       f(x+h) \approx f(x) + f_prime(x) h.
+    """
+    epsilon = 1.0e-8
+    def f_prime(x):
+        assert len(x.shape) == 1
+        D = x.shape[0]
+        deltas = epsilon * np.eye(D)
+        res = np.zeros((D,D))
+        rx = r(x)
+        for d in range(D):
+            res[:,d] = (r(x + deltas[d,:]) - rx)/epsilon
+        return res
+    return f_prime
+
+
+
+
 def get_dict_key_or_default(D, key, default, want_error_if_missing = False):
     if D.has_key(key):
         return D[key]
@@ -277,6 +457,15 @@ def mcmc_generate_samples(sampling_options):
     # E would be something like ninja_start_distribution.E, and grad_E would be ninja_start_distribution.grad_E
     E               = get_dict_key_or_default(sampling_options, 'E',               None)
     grad_E          = get_dict_key_or_default(sampling_options, 'grad_E',          None)
+
+    # applicable only when dealing with a DAE
+    f               = get_dict_key_or_default(sampling_options, 'f',               None)
+    f_prime         = get_dict_key_or_default(sampling_options, 'f_prime',         None)
+
+    # use when given
+    r               = get_dict_key_or_default(sampling_options, 'r',               None)
+    r_prime         = get_dict_key_or_default(sampling_options, 'r_prime',         None)
+
 
     # Run a sanity check to be sure that E and grad_E take the correct input dimension given by x0.
     # This could later be used to poke around to see if E and grad_E are vectorial or not.
@@ -341,6 +530,10 @@ def mcmc_generate_samples(sampling_options):
 
             #(asymmetric_proposal, r) = metropolis_hastings_sampler.make_langevin_sampler_requirements(langevin_lambda, ninja_star_distribution.grad_E)
             #(X, acceptance_ratio) = metropolis_hastings_sampler.run_chain_with_energy(None, x0, None, n_samples, thinning_factor = thinning_factor, burn_in = burn_in, grad_E = ninja_star_distribution.grad_E, asymmetric_proposal = asymmetric_proposal)
+
+        elif mcmc_method == "metropolis_hastings_svd_grad_E":
+
+            (X, acceptance_ratio) = run_chain_with_SVD(x0[c,:], n_samples, proposal_stddev = proposal_stddev, grad_E = grad_E, r = r, r_prime = r_prime, f_prime = f_prime, thinning_factor = thinning_factor, burn_in = burn_in)
 
         else:
             raise("Unrecognized value for parameter 'mcmc_method' : %s" % (mcmc_method,))

@@ -25,8 +25,7 @@ class DAE_untied_weights(DAE):
                  n_hiddens=None,
                  Wc=None, Wb=None,
                  c=None,  b=None,
-                 s=None, act_func=['tanh', 'tanh'],
-                 want_plus_x = False):
+                 s=None, act_func=['tanh', 'tanh']):
         """
         Initialize a DAE.
         
@@ -81,11 +80,12 @@ class DAE_untied_weights(DAE):
                 print "It's a bad idea to use the identity as first activation function. \nMaybe you got the ordering mixed up ?"
         self.act_func = act_func
 
-        self.want_plus_x = want_plus_x
+        self.want_plus_x = False
         self.tied_weights = False
 
         # then setup the theano functions once
         self.theano_setup()
+        self.theano_setup_flat()
     
     def theano_setup(self):
     
@@ -122,8 +122,6 @@ class DAE_untied_weights(DAE):
         else:
             raise("Invalid act_func[1]")
 
-        if self.want_plus_x:
-            r = r + x
 
         # Another variable to be able to call a function
         # with a noisy x and compare it to a reference x.
@@ -165,11 +163,6 @@ class DAE_untied_weights(DAE):
         if X.shape[1] != self.n_inputs:
             raise("Using wrong shape[1] for the argument X to DAE.encode_decode. It's %d when it should be %d" % (X.shape[1], self.n_inputs))
 
-        #print self.Wb.shape
-        #print self.Wc.shape
-        #print self.b.shape
-        #print self.c.shape
-
         return self.theano_encode_decode(self.Wb, self.Wc, self.b, self.c, self.s, X)
 
     def model_loss(self, X, noisy_X = None):
@@ -180,6 +173,59 @@ class DAE_untied_weights(DAE):
         Returns  loss: array-like, shape (n_examples,)
         """
         return self.theano_loss(self.Wb, self.Wc, self.b, self.c, self.s, noisy_X, X)
+
+
+
+    def theano_setup_flat(self):
+    
+        Wb = T.dmatrix('Wb')
+        Wc = T.dmatrix('Wc')
+        b = T.dvector('b')
+        c = T.dvector('c')
+        s = T.dscalar('s')
+        x = T.vector('x')
+    
+        h_act = T.dot(x, Wc) + c
+        if self.act_func[0] == 'tanh':
+            h = T.tanh(h_act)
+        elif self.act_func[0] == 'sigmoid':
+            h = T.nnet.sigmoid(h_act)
+        elif self.act_func[0] == 'id':
+            h = h_act
+        else:
+            raise("Invalid act_func[0]")
+
+        r_act = T.dot(h, Wb.T) + b
+        if self.act_func[1] == 'tanh':
+            r = s * T.tanh(r_act)
+        elif self.act_func[1] == 'sigmoid':
+            r = s * T.nnet.sigmoid(r_act)
+        elif self.act_func[1] == 'id':
+            r = s * r_act
+        else:
+            raise("Invalid act_func[1]")
+
+        # Finally, we are interested in the derivatives of the
+        # encode and encode_decode functions because these are
+        # useful in the context of sampling.
+        #
+        # For now I'm not sure if it's even possible to do this
+        # because X is defined to be a matrix.
+        # That's again thanks to the dual-mission of vectoring
+        # that certain dimensions are given.
+        self.theano_jacobian_encode = function([Wc,c,x], theano.gradient.jacobian(h,x), allow_input_downcast=True)
+        self.theano_jacobian_encode_decode = function([Wb,Wc,b,c,s,x], theano.gradient.jacobian(r,x), allow_input_downcast=True)
+
+    def jacobian_encode(self, x):
+        assert len(x.shape) == 1
+        assert x.shape[0] == self.n_inputs
+        return self.theano_jacobian_encode(self.Wc, self.c, x)
+
+    def jacobian_encode_decode(self, x):
+        assert len(x.shape) == 1
+        assert x.shape[0] == self.n_inputs
+        return self.theano_jacobian_encode_decode(self.Wb, self.Wc, self.b, self.c, self.s, x)
+
 
 
     def reset_params(self):
