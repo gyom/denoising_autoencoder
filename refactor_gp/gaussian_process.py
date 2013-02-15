@@ -41,11 +41,27 @@ def sample_trajectory_1D(x, y, kernel, x_star, obs_noise_stddev, n_samples = Non
     f_star_cov = kxsxs - B.dot(kxxs)
     
     if n_samples:
-        samples = np.random.multivariate_normal(mean = f_star_mean, cov = f_star_cov, size = n_samples)
+        samples = np.zeros((n_samples, N))
+        for n in range(n_samples):
+            samples[n,:] = np.random.multivariate_normal(mean = f_star_mean, cov = f_star_cov)
     else:
         samples = np.random.multivariate_normal(mean = f_star_mean, cov = f_star_cov)
 
+    #print f_star_mean
+    #print f_star_cov
+
+    # It might be relevant to return the likelihood of the given trajectories
+    # in terms of the model from which they are drawn.
     return {'samples' : samples,
             'f_star_mean': f_star_mean,
             'f_star_cov': f_star_cov}
 
+
+def square_distance_kernel_1D(x1,x2,kernel_stddev):
+    N = x1.shape[0]
+    M = x2.shape[0]
+    x1 = np.tile(x1.reshape((-1,1)), (1,M))
+    x2 = np.tile(x2.reshape((1,-1)), (N,1))
+    D = np.exp(-0.5*((x1-x2)/kernel_stddev)**2)
+    #print D
+    return D
