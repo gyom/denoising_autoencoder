@@ -89,10 +89,16 @@ def main(argv):
                                                    noise_stddevs,
                                                    {'method' : 'fmin_l_bfgs_b',
                                                     'maxiter' : maxiter,
-                                                   'm':lbfgs_rank})
+                                                   'm':lbfgs_rank},
+                                                   {'stop_if_loss_greater_than':"auto"})
     end_time = time.time()
     computational_cost_in_seconds = int(end_time - start_time)
     print "Training took %d seconds." % computational_cost_in_seconds
+
+    early_termination_occurred = False
+    if np.nan in model_losses:
+        early_termination_occurred = True
+        print "We terminated early in the training because we couldn't do better than the identity function r(x) = x."
 
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -113,7 +119,9 @@ def main(argv):
                      'noise_stddevs':noise_stddevs,
                      'train_samples_pickle':train_samples_pickle,
                      'model_losses':model_losses,
-                     'computational_cost_in_seconds':computational_cost_in_seconds}
+                     'computational_cost_in_seconds':computational_cost_in_seconds,
+                     'early_termination_occurred':early_termination_occurred}
+
     cPickle.dump(extra_details, open(extra_pickle_file, "w"))
     json.dump(extra_details, open(extra_json_file, "w"))
     print "Wrote %s" % (extra_pickle_file,)

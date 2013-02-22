@@ -118,18 +118,59 @@ class DAE(object):
         return (best_q, U(best_q))
 
     def fit_with_decreasing_noise(self, X, list_of_train_stddev,
-                                  optimization_args):
+                                  optimization_args, early_termination_args = {}):
+        """
+        The 'optimization_args' filters through to the 'fit' function unchanged
+
+        The 'early_termination_args' is optional. It provides a way to
+        stop the training if we determine that we started in a state
+        that was irredeemable and would only lead to a bad local minimum.
+        We can keep in mind the r(x) = x solution as a benchmark and
+        observe that, with r(x) = x we would have a loss function that
+        roughly equals
+            d * train_stddev**2, where d is the dimension of the data.
+
+        The 'early_termination_args' dict has one key for now.
+            early_termination_args['stop_if_loss_greater_than'] = [...]
+                or
+            early_termination_args['stop_if_loss_greater_than'] = "auto"
+
+        """
+
+        # If we were passed the argument "auto", we have to replace the
+        # value with an array of corresponding values.
+        if type(early_termination_args['stop_if_loss_greater_than']) == "str":
+            if early_termination_args['stop_if_loss_greater_than'] == "auto"):
+                early_termination_args['stop_if_loss_greater_than'] = [X.shape[0] * train_stddev**2 for train_stddev in list_train_stddev]
+            else:
+                print "Wrong value for early_termination_args. Only valid string is 'auto'."
+                print "Exiting."
+                quit()
+
         seq_mean_best_U_q = []
+        i = 0
         for train_stddev in list_of_train_stddev:
+
             sys.stdout.write("Using train_stddev %f, " % train_stddev)
             noisy_X = X + np.random.normal(size = X.shape, scale = train_stddev)
             (_, U_best_q) = self.fit(X, noisy_X, optimization_args)
             sys.stdout.write("mean loss is %f" % (U_best_q / X.shape[0]))
-            seq_mean_best_U_q.append(U_best_q / X.shape[0])
+            mean_U_best_q = U_best_q / X.shape[0]
+
+            if (early_termination_args.has_key('stop_if_loss_greater_than') and
+                early_termination_args['stop_if_loss_greater_than'][i] < mean_U_best_q):
+                # terminate the training at this point
+                seq_mean_best_U_q.append(mean_U_best_q)
+                # might as well pad the rest of the list to
+                # signify that we terminated early
+                while len(seq_mean_best_U_q) < len(list_of_train_stddev):
+                    seq_mean_best_U_q.append(np.nan)
+                return seq_mean_best_U_q
+
+            seq_mean_best_U_q.append(mean_U_best_q)
+            i += 1
             print ""
-            # Should we log the optimization results in some way here
-            # so as to print graphs showing the state of the learned
-            # density as we decrease train_stddev ?
+        # end for
 
         return seq_mean_best_U_q
 

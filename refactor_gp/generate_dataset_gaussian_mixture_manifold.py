@@ -37,9 +37,8 @@ def sample_manifold_components(d, n_components, ratio_eigvals):
 
 
 def usage():
-    print "-- python generate_dataset_gaussian_mixture_manifold.py --d=50 --n_train=10000 --n_test=10000 --ratio_eigvals=10.0 --n_components=10 --output_dir=/data/lisatmp2/alaingui/dae/datasets/gaussian_mixture"
+    print "-- python generate_dataset_gaussian_mixture_manifold.py --d=50 --n_train=10000 --n_test=10000 --ratio_eigvals=0.1 --n_components=25 --output_dir=/data/lisatmp2/alaingui/dae/datasets/gaussian_mixture/0001"
     print ""
-    print "mixing_prop being 0.0 will get you nowhere. With 1.0 you get the most randomness for the manifold direction."
 
 def main(argv):
     """
@@ -108,8 +107,6 @@ def main(argv):
     computational_cost_in_seconds = int(end_time - start_time)
     print "Sampling took %d seconds." % computational_cost_in_seconds
 
-    print component_means
-
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
         print "Creating directory %s" % output_dir,
@@ -155,7 +152,10 @@ def main(argv):
 
     for i in range(0,d-1):
         output_image_file = os.path.join(output_dir,"overview_dimensions_%d_and_%d.png" % (i,i+1))
-        plot_the_overview(samples, i, i+1, output_image_file)
+        if samples.shape[0] > 500:
+            plot_the_overview(samples[0:500,:], i, i+1, output_image_file)
+        else:
+            plot_the_overview(samples, i, i+1, output_image_file)
         print "wrote " + output_image_file
 
 

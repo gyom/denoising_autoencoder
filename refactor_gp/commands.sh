@@ -33,4 +33,7 @@ cPickle.dump(E[2][1], open("/data/lisatmp2/alaingui/dae/datasets/mnist/test_indi
 
 
 
-python generate_dataset_gaussian_mixture_manifold.py --d=10 --n_train=1000 --n_test=1000 --mixing_prop=0.5 --leading_eigenvalue=10.0 --n_components=25 --output_dir="/data/lisatmp2/alaingui/dae/datasets/gaussian_mixture"
+python generate_dataset_gaussian_mixture_manifold_2.py --d=10 --n_train=1000 --n_test=1000 --mixing_prop=0.5 --leading_eigenvalue=10.0 --n_components=25 --output_dir="/data/lisatmp2/alaingui/dae/datasets/gaussian_mixture"
+
+
+python generate_dataset_gaussian_mixture_manifold.py --d=4 --n_train=1000 --n_test=1000 --ratio_eigvals=10.0 --n_components=25 --output_dir="/data/lisatmp2/alaingui/dae/datasets/gaussian_mixture/12"
