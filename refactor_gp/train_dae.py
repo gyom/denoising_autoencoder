@@ -23,7 +23,7 @@ def main(argv):
     import json
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hv", ["n_hiddens=", "maxiter=", "lbfgs_rank=", "act_func=", "noise_stddevs=", "train_samples_pickle=", "output_dir="])
+        opts, args = getopt.getopt(sys.argv[1:], "hv", ["n_hiddens=", "maxiter=", "lbfgs_rank=", "act_func=", "noise_stddevs=", "train_samples_pickle=", "output_dir=", "want_early_termination="])
     except getopt.GetoptError as err:
         # print help information and exit:
         print str(err) # will print something like "option -a not recognized"
@@ -37,6 +37,7 @@ def main(argv):
     noise_stddevs = None
     train_samples_pickle = None
     output_dir = None
+    want_early_termination = False
 
     verbose = False
     for o, a in opts:
@@ -64,9 +65,13 @@ def main(argv):
             train_samples_pickle = a
         elif o in ("--output_dir"):
             output_dir = a
+        elif o in ("--want_early_termination"):
+            want_early_termination = ((a == "True") or (a == "true") or (a=="1"))
         else:
             assert False, "unhandled option"
  
+    #print "want_early_termination is %d" % want_early_termination
+
     assert os.path.exists(train_samples_pickle)
     samples = cPickle.load(open(train_samples_pickle, 'rb'))
     n_samples, n_inputs = samples.shape
@@ -85,15 +90,21 @@ def main(argv):
     #                                 'gtol':0.001})
 
     start_time = time.time()
+
+    if want_early_termination:
+        early_termination_args = {'stop_if_loss_greater_than':"auto"}
+    else:
+        early_termination_args = {}
+
     model_losses = mydae.fit_with_decreasing_noise(samples,
                                                    noise_stddevs,
                                                    {'method' : 'fmin_l_bfgs_b',
                                                     'maxiter' : maxiter,
                                                    'm':lbfgs_rank},
-                                                   {'stop_if_loss_greater_than':"auto"})
+                                                   early_termination_args)
     end_time = time.time()
     computational_cost_in_seconds = int(end_time - start_time)
-    print "Training took %d seconds." % computational_cost_in_seconds
+    print "Training took %d seconds." % (computational_cost_in_seconds,)
 
     early_termination_occurred = False
     if np.nan in model_losses:

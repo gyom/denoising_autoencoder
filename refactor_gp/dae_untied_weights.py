@@ -25,7 +25,8 @@ class DAE_untied_weights(DAE):
                  n_hiddens=None,
                  Wc=None, Wb=None,
                  c=None,  b=None,
-                 s=None, act_func=['tanh', 'tanh']):
+                 s=None, act_func=['tanh', 'tanh'],
+                 want_constant_s = False):
         """
         Initialize a DAE.
         
@@ -45,13 +46,27 @@ class DAE_untied_weights(DAE):
             Biases of the hidden units
         b : array-like, shape (n_inputs,), optional
             Biases of the input units
-        s : real
+        s : array-like, shape (n_inputs,), optional
             Applied after the second tanh at the output.
             Allows us to represent values in a range [-4,4]
             instead of just [-1,1] by using alpha = 4.0.
+            This used to be just a real number, but now
+            we use a vector because we want to scale each output
+            independantly.
         """
 
-        # These values are to be treated as READ-ONLY.
+        # Note that we should probably be using some scheme
+        # where we have two constructors. One takes arguments,
+        # and the other takes a pickle file and feeds the
+        # parameters into the first constructor.
+        # This would avoid potential issues with saving/loading
+        # trained DAEs.
+
+        # These values are to be treated as READ-ONLY,
+        # but they're actually modified when we load the
+        # DAE from a pickle file. This infraction is acceptable
+        # because the DAE is not used in any way before
+        # we load the pickle and set the values for n_inputs and n_hiddens.
         self.n_inputs = n_inputs
         self.n_hiddens = n_hiddens
 
@@ -70,6 +85,8 @@ class DAE_untied_weights(DAE):
         if not (s == None):
             self.s = s
 
+        self.want_constant_s = want_constant_s
+
         if len(act_func) != 2:
             raise("Need to specify two activation functions from : ['tanh', 'sigmoid', 'id'].")
         else:
@@ -78,6 +95,9 @@ class DAE_untied_weights(DAE):
                     raise("Unrecognized activation function. Should be from : ['tanh', 'sigmoid', 'id'].")
             if act_func[0] == 'id':
                 print "It's a bad idea to use the identity as first activation function. \nMaybe you got the ordering mixed up ?"
+            if act_func[1] == 'id':
+                print "To use the identity function as second activation function, we will keep s=[1.0, ..., 1.0] constant. This avoids clashes with Wb."
+                self.want_constant_s = True
         self.act_func = act_func
 
         self.want_plus_x = False
@@ -98,7 +118,7 @@ class DAE_untied_weights(DAE):
         Wc = T.dmatrix('Wc')
         b = T.dvector('b')
         c = T.dvector('c')
-        s = T.dscalar('s')
+        s = T.dvector('s')
         x = T.dmatrix('x')
     
         h_act = T.dot(x, Wc) + c
@@ -182,8 +202,8 @@ class DAE_untied_weights(DAE):
         Wc = T.dmatrix('Wc')
         b = T.dvector('b')
         c = T.dvector('c')
-        s = T.dscalar('s')
-        x = T.vector('x')
+        s = T.dvector('s')
+        x = T.dvector('x')
     
         h_act = T.dot(x, Wc) + c
         if self.act_func[0] == 'tanh':
@@ -229,11 +249,22 @@ class DAE_untied_weights(DAE):
 
 
     def reset_params(self):
-        self.Wb = np.random.uniform( low = -1.0, high = 1.0, size=(self.n_inputs, self.n_hiddens) )
-        self.Wc = np.random.uniform( low = -1.0, high = 1.0, size=(self.n_inputs, self.n_hiddens) )
+
+        #(scale_Wb, scale_Wc) = (1.0, 1.0)
+
+        # Scaling them in a way that anticipates the fact that
+        # with random inputs centered around 0.0, we should want
+        # to end up with values distributed according to roughly N(0,1).
+        scale_Wb = 1.0 / np.sqrt(self.n_inputs)
+        scale_Wc = 1.0 / np.sqrt(self.n_hiddens)
+
+        self.Wb = np.random.uniform( low = -1.0, high = 1.0, size=(self.n_inputs, self.n_hiddens) ) * scale_Wb
+        self.Wc = np.random.uniform( low = -1.0, high = 1.0, size=(self.n_inputs, self.n_hiddens) ) * scale_Wc
         self.b  = np.random.uniform( low = -0.1, high = 0.1, size=(self.n_inputs,) )
         self.c  = np.random.uniform( low = -0.1, high = 0.1, size=(self.n_hiddens,) )
-        self.s  = 1.0
+        # s is a factor and 1 is the neutral element for the product, so we'll start with values close to 1.
+        self.s  = np.ones((self.n_inputs,))
+        #self.s  = 1.0
 
     
     # tip : Write the U(q) and grad_U(q) methods
@@ -249,6 +280,12 @@ class DAE_untied_weights(DAE):
     def q_grad(self, q, X, noisy_X):
         (Wb, Wc, b, c, s) = DAE_untied_weights.read_params_from_q(q, self.n_inputs, self.n_hiddens)
         (grad_Wb, grad_Wc, grad_b, grad_c, grad_s) = self.theano_gradients(Wb, Wc, b, c, s, noisy_X, X)
+
+        # There might be a simpler way with theano to do this,
+        # but this seems like a good approach.
+        if self.want_constant_s:
+            grad_s = np.zeros((grad_s.shape))
+
         return DAE_untied_weights.serialize_params_as_q(grad_Wb, grad_Wc, grad_b, grad_c, grad_s)
 
     def q_loss(self, q, X, noisy_X):
@@ -263,7 +300,7 @@ class DAE_untied_weights(DAE):
                           Wc.reshape((-1,)),
                           b.reshape((-1,)),
                           c.reshape((-1,)),
-                          s)).reshape((-1,))
+                          s.reshape((-1,))     )).reshape((-1,))
 
     @staticmethod
     def read_params_from_q(q, n_inputs, n_hiddens):
@@ -272,20 +309,20 @@ class DAE_untied_weights(DAE):
         n_elems_Wc = n_inputs * n_hiddens
         n_elems_b = n_inputs
         n_elems_c = n_hiddens
-        n_elems_s = 1
+        n_elems_s = n_inputs
 
         bounds = (0,
                   n_elems_Wb,
                   n_elems_Wb + n_elems_Wc,
                   n_elems_Wb + n_elems_Wc + n_elems_b,
                   n_elems_Wb + n_elems_Wc + n_elems_b + n_elems_c,
-                  n_elems_Wb + n_elems_Wc + n_elems_b + n_elems_c + 1)
+                  n_elems_Wb + n_elems_Wc + n_elems_b + n_elems_c + n_elems_s)
 
         Wb = q[ bounds[0] : bounds[1] ].reshape((n_inputs, n_hiddens)).copy()
         Wc = q[ bounds[1] : bounds[2] ].reshape((n_inputs, n_hiddens)).copy()
         b  = q[ bounds[2] : bounds[3] ].reshape((n_elems_b,)).copy()
         c  = q[ bounds[3] : bounds[4] ].reshape((n_elems_c,)).copy()
-        s  = q[ bounds[4] : bounds[5] ].reshape((n_elems_s,))[0]
+        s  = q[ bounds[4] : bounds[5] ].reshape((n_elems_s,)).copy()
 
         return (Wb, Wc, b, c, s)
 
@@ -295,7 +332,8 @@ class DAE_untied_weights(DAE):
         cPickle.dump({'q':self.q_read_params(),
                       'act_func':self.act_func,
                       'n_inputs':self.n_inputs,
-                      'n_hiddens':self.n_hiddens},
+                      'n_hiddens':self.n_hiddens,
+                      'want_constant_s':self.want_constant_s},
                      open(pickle_file_path, "w"))
 
     def load_pickle(self, pickle_file_path):
@@ -314,6 +352,8 @@ class DAE_untied_weights(DAE):
         self.n_hiddens = params['n_hiddens']
         self.act_func = params['act_func']
         self.q_set_params(params['q'])
+        if params.has_key('want_constant_s'):
+            self.want_constant_s = params['want_constant_s']
         # we need to regenerate the theano functions
         self.theano_setup()
         self.theano_setup_flat()

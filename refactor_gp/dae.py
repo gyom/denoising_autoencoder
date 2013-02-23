@@ -139,9 +139,11 @@ class DAE(object):
 
         # If we were passed the argument "auto", we have to replace the
         # value with an array of corresponding values.
-        if type(early_termination_args['stop_if_loss_greater_than']) == "str":
-            if early_termination_args['stop_if_loss_greater_than'] == "auto"):
-                early_termination_args['stop_if_loss_greater_than'] = [X.shape[0] * train_stddev**2 for train_stddev in list_train_stddev]
+        if (early_termination_args.has_key('stop_if_loss_greater_than') and type(early_termination_args['stop_if_loss_greater_than']) == str):
+            if early_termination_args['stop_if_loss_greater_than'] == "auto":
+                early_termination_args['stop_if_loss_greater_than'] = [X.shape[1] * train_stddev**2 for train_stddev in list_of_train_stddev]
+                print "early termination with losses : "
+                print early_termination_args['stop_if_loss_greater_than']
             else:
                 print "Wrong value for early_termination_args. Only valid string is 'auto'."
                 print "Exiting."
@@ -155,6 +157,7 @@ class DAE(object):
             noisy_X = X + np.random.normal(size = X.shape, scale = train_stddev)
             (_, U_best_q) = self.fit(X, noisy_X, optimization_args)
             sys.stdout.write("mean loss is %f" % (U_best_q / X.shape[0]))
+            print ""
             mean_U_best_q = U_best_q / X.shape[0]
 
             if (early_termination_args.has_key('stop_if_loss_greater_than') and
@@ -169,7 +172,6 @@ class DAE(object):
 
             seq_mean_best_U_q.append(mean_U_best_q)
             i += 1
-            print ""
         # end for
 
         return seq_mean_best_U_q
