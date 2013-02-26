@@ -40,6 +40,7 @@ def mcmc_generate_samples(sampling_options):
     # E would be something like ninja_start_distribution.E, and grad_E would be ninja_start_distribution.grad_E
     E               = get_dict_key_or_default(sampling_options, 'E',               None)
     grad_E          = get_dict_key_or_default(sampling_options, 'grad_E',          None)
+    n_E_approx_path = get_dict_key_or_default(sampling_options, 'n_E_approx_path', None)
 
     # applicable only when dealing with a DAE
     f               = get_dict_key_or_default(sampling_options, 'f',               None)
@@ -84,10 +85,23 @@ def mcmc_generate_samples(sampling_options):
     #
     def zero_energy_difference(proposed_x, current_x):
         return 0.0
-    # def approximate_energy_difference_by_integration(proposed_x, current_x):
-    #    do something like a linspace summation with approximate_energy_difference
-    #    as suggested by Yutian
-    
+    def approximate_energy_difference_by_path_integration(proposed_x, current_x):
+        # We approximate the energy difference by integrating the gradient
+        # over a path from current_x to proposed_x. The path used is
+        # a simple line segment. Original idea suggested by Yutian.
+        # The number of points used for the approximation of the path
+        # is baked into this function.
+        d = proposed_x.shape[0]
+        t = np.tile(np.linspace(0,1,n_E_approx_path).reshape((-1,1)),
+                    (1,d))
+        grad_E_path = (1 - t) * current_x.reshape((1,-1)) + t * proposed_x.reshape((1,-1))
+
+        # debug
+        #print "%f, %f" % (grad_E_path.dot(proposed_x - current_x).mean(),
+        #                  approximate_energy_difference(proposed_x, current_x) )
+
+        return grad_E_path.dot(proposed_x - current_x).mean()
+
     samples_for_all_chains = np.zeros((n_chains, n_samples, d))
     acceptance_ratio_list = []
     sampling_start_time = time.time()
@@ -106,8 +120,15 @@ def mcmc_generate_samples(sampling_options):
         #
         if mcmc_method == 'langevin_grad_E':
             assert r
+            assert r_prime
             assert langevin_lambda > 0
-            (X, acceptance_ratio) = langevin.sample_chain(x0[c,:], n_samples, approximate_energy_difference, langevin_lambda, r, thinning_factor = thinning_factor, burn_in = burn_in, accept_all_proposals = True)
+
+            if n_E_approx_path and n_E_approx_path > 1:
+                energy_difference = approximate_energy_difference_by_path_integration
+            else:
+                energy_difference = approximate_energy_difference
+
+            (X, acceptance_ratio) = langevin.sample_chain(x0[c,:], n_samples, energy_difference, langevin_lambda, r, r_prime, thinning_factor = thinning_factor, burn_in = burn_in, accept_all_proposals = True)
         #
         #elif mcmc_method == 'MH_langevin_E':
         #
@@ -123,15 +144,28 @@ def mcmc_generate_samples(sampling_options):
         #
         elif mcmc_method == 'MH_langevin_grad_E':
             assert r
+            assert r_prime
             assert langevin_lambda > 0
-            (X, acceptance_ratio) = langevin.sample_chain(x0[c,:], n_samples, approximate_energy_difference, langevin_lambda, r, thinning_factor = thinning_factor, burn_in = burn_in)
+
+            if n_E_approx_path and n_E_approx_path > 1:
+                energy_difference = approximate_energy_difference_by_path_integration
+            else:
+                energy_difference = approximate_energy_difference
+
+            (X, acceptance_ratio) = langevin.sample_chain(x0[c,:], n_samples, energy_difference, langevin_lambda, r, r_prime, thinning_factor = thinning_factor, burn_in = burn_in)
 
         elif mcmc_method == "MH_svd_grad_E":
             assert f_prime
             assert r_prime
             assert r
             assert proposal_stddev > 0
-            (X, acceptance_ratio) = svd.sample_chain(x0[c,:], n_samples, approximate_energy_difference, proposal_stddev = proposal_stddev, r = r, r_prime = r_prime, f_prime = f_prime, thinning_factor = thinning_factor, burn_in = burn_in)
+
+            if n_E_approx_path and n_E_approx_path > 1:
+                energy_difference = approximate_energy_difference_by_path_integration
+            else:
+                energy_difference = approximate_energy_difference
+
+            (X, acceptance_ratio) = svd.sample_chain(x0[c,:], n_samples, energy_difference, proposal_stddev = proposal_stddev, r = r, r_prime = r_prime, f_prime = f_prime, thinning_factor = thinning_factor, burn_in = burn_in)
         else:
             raise("Unrecognized value for parameter 'mcmc_method' : %s" % (mcmc_method,))
 

@@ -7,10 +7,12 @@ import refactor_gp
 import refactor_gp.models
 from   refactor_gp.models import dae_untied_weights
 
-import refactor_gp
+#import refactor_gp
 import refactor_gp.sampling
 from   refactor_gp.sampling import dispatcher
 
+import refactor_gp.tools
+from   refactor_gp.tools import plot_overview_slices_for_samples
 
 def usage():
     print ""
@@ -25,7 +27,7 @@ def main(argv):
     import json
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hv", ["pickled_dae_dir=", "mcmc_method=", "n_samples=", "thinning_factor=", "proposal_stddev=", "output_dir="])
+        opts, args = getopt.getopt(sys.argv[1:], "hv", ["pickled_dae_dir=", "mcmc_method=", "n_samples=", "thinning_factor=", "proposal_stddev=", "langevin_lambda=",  "output_dir=", "n_E_approx_path=", "want_overview_plots="])
     except getopt.GetoptError as err:
         # print help information and exit:
         print str(err) # will print something like "option -a not recognized"
@@ -39,6 +41,9 @@ def main(argv):
     burn_in = None
     proposal_stddev = None
     output_dir = None
+    n_E_approx_path = None
+    langevin_lambda = None
+    want_overview_plots = False
 
     verbose = False
     for o, a in opts:
@@ -57,8 +62,14 @@ def main(argv):
             thinning_factor = int(a)
         elif o in ("--burn_in"):
             burn_in = int(a)
+        elif o in ("--langevin_lambda"):
+            langevin_lambda = float(a)
         elif o in ("--proposal_stddev"):
             proposal_stddev = float(a)
+        elif o in ("--n_E_approx_path"):
+            n_E_approx_path = float(a)
+        elif o in ("--want_overview_plots"):
+            want_overview_plots = ((a == "True") or (a == "true") or (a == "1"))
         elif o in ("--output_dir"):
             output_dir = a
         else:
@@ -98,31 +109,42 @@ def main(argv):
     n_inputs = extra_details['n_inputs']
     n_hiddens = extra_details['n_hiddens']
 
-    langevin_lambda = None
+    train_noise_stddev = None
     for (loss, noise_stddev) in zip(extra_details['model_losses'],
                                     extra_details['noise_stddevs']):
         if np.isnan(loss):
             break
         else:
-            langevin_lambda = noise_stddev
+            train_noise_stddev = noise_stddev
 
     # At that point, langevin_lambda should be the associated
     # value for that DAE that we loaded. If langevin_lambda is
     # still None, it means that we've loaded a model that was
     # not trained properly.
-    assert langevin_lambda
-    print "Using langevin_lambda %f" % (langevin_lambda,)
+    assert train_noise_stddev
+    print "Obtaining grad_E from r and the fact that train_noise_stddev %f" % (train_noise_stddev,)
 
     dae_params = read_parameters_from_dae(mydae)
     r = dae_params['r']
 
     # don't forget the minus sign here !
     # remember that r(x) - x is propto  -1 * dE/dx
-    grad_E = lambda x: -1*(r(x)-x) / langevin_lambda
+    grad_E = lambda x: -1*(r(x)-x) / train_noise_stddev
 
     # We always sample from the origin.
     x0 = np.zeros((n_inputs,))
 
+    if mcmc_method in ['MH_langevin_grad_E', 'langevin_grad_E']:
+        if not langevin_lambda:
+            print "We haven't received a value for the langevin_lambda so we'll use train_noise_stddev**2 == %f instead." % train_noise_stddev**2
+            langevin_lambda = train_noise_stddev**2
+        else:
+            print "Using langevin_lambda == %f. This should probably be equal or smaller than train_noise_stddev**2 == %f." % (langevin_lambda, train_noise_stddev**2)
+    else:
+        if langevin_lambda:
+            print "Conceptual error in the arguments. You don't need to specify langevin_lambda, but you did."
+            print "Check to see if the list of supported methods was extended without adding this into the verifications."
+            quit()
 
     sampling_options = {'x0':x0,
                         'f_prime':dae_params['f_prime'],
@@ -130,14 +152,18 @@ def main(argv):
                         'r_prime':dae_params['r_prime'],
                         'mcmc_method':mcmc_method,
                         'grad_E':grad_E,
-                        'n_samples':n_samples,
-                        'langevin_lambda':langevin_lambda}
+                        'n_samples':n_samples}
+    
     if burn_in:
         sampling_options['burn_in'] = burn_in
     if thinning_factor:
         sampling_options['thinning_factor'] = thinning_factor
     if proposal_stddev:
         sampling_options['proposal_stddev'] = proposal_stddev
+    if n_E_approx_path:
+        sampling_options['n_E_approx_path'] = n_E_approx_path
+    if langevin_lambda:
+        sampling_options['langevin_lambda'] = langevin_lambda
 
     #### Perform the sampling. ####
 
@@ -148,11 +174,11 @@ def main(argv):
     #                proposals_per_second
     #                acceptance_ratio
 
-    print "Sampling took %d seconds." % (res['elapsed_time'],)
     print ""
+    print "Sampling took %d seconds." % (res['elapsed_time'],)
     print "Proposals per second : 10^%0.2f." % (np.log(res['proposals_per_second'])/np.log(10),)
     print "Acceptance ratio : %0.3f." % (res['acceptance_ratio'],)
-
+    print ""
 
     #### Write out the results. ####
 
@@ -174,6 +200,7 @@ def main(argv):
     sampling_extra_details['thinning_factor'] = thinning_factor
     sampling_extra_details['burn_in'] = burn_in
     sampling_extra_details['proposal_stddev'] = proposal_stddev
+    sampling_extra_details['n_E_approx_path'] = n_E_approx_path
 
     sampling_extra_pickle_file = os.path.join(output_dir, "sampling_extra_details.pkl")
     sampling_extra_json_file = os.path.join(output_dir, "sampling_extra_details.json")
@@ -192,8 +219,21 @@ def main(argv):
 
     import shutil
     output_dir_subdir = os.path.join(output_dir, "trained_dae")
+    if os.path.exists(output_dir_subdir):
+        shutil.rmtree(output_dir_subdir)
     shutil.copytree(pickled_dae_dir, output_dir_subdir)
     print "Transfered trained DAE from %s to %s" % (pickled_dae_dir, output_dir_subdir)
+
+
+    #### Option to generate plots. ####
+
+    # This option will probably be left on when
+    # we do a lot of debugging to get to the right
+    # hyperparameters, and then left off when
+    # we just want to launch a lot of tasks afterwards.
+
+    if want_overview_plots:
+        plot_overview_slices_for_samples.main([None, "--pickled_samples_file=%s" % (samples_file,)] )
 
     print "Done."
 

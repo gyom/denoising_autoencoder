@@ -4,7 +4,7 @@ import scipy
 
 def sample_chain(x0, N,
                 energy_difference, langevin_lambda,
-                r,
+                r, r_prime,
                 thinning_factor = 1, burn_in = 0,
                 accept_all_proposals = False):
     """
@@ -26,7 +26,10 @@ def sample_chain(x0, N,
         # Now we need to compute
         # log q( current_x | proposed_x ) - log q( proposed_x | current_x )
 
-        asymmetric_correction_log_factor = 0.5/(2*langevin_lambda)*( - ((preimage_current_x - proposed_x)**2).sum() + ((preimage_proposed_x - current_x)**2).sum())
+        asymmetric_correction_log_factor = ( (0.5/(2*langevin_lambda)*( - ((preimage_current_x - proposed_x)**2).sum() +
+                                                                          ((preimage_proposed_x - current_x)**2).sum()))  +
+                                             -1 * np.linalg.det(r_prime(preimage_current_x)) +
+                                              1 * np.linalg.det(r_prime(preimage_proposed_x))   )
 
         return (proposed_x, preimage_proposed_x, asymmetric_correction_log_factor)
 
@@ -35,6 +38,8 @@ def sample_chain(x0, N,
         for _ in np.arange(N):
             (proposed_x, preimage_proposed_x, asymmetric_correction_log_factor) = langevin_proposal(current_x, preimage_current_x)
 
+            # This is a - in front of the energy difference because
+            # log( p(proposed_x) / p(current_x) ) \approx -E(proposed_x) - -E(current_x) = - energy_difference(proposed_x, current_x)
             loga = - energy_difference(proposed_x, current_x) + asymmetric_correction_log_factor
             if accept_all_proposals or loga >= 0 or loga >= np.log(np.random.uniform(0,1)):
                 # accepted !

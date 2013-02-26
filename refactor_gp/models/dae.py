@@ -118,7 +118,7 @@ class DAE(object):
         return (best_q, U(best_q))
 
     def fit_with_decreasing_noise(self, X, list_of_train_stddev,
-                                  optimization_args, early_termination_args = {}):
+                                  optimization_args, early_termination_args = {}, X_valid = None):
         """
         The 'optimization_args' filters through to the 'fit' function unchanged
 
@@ -135,6 +135,10 @@ class DAE(object):
                 or
             early_termination_args['stop_if_loss_greater_than'] = "auto"
 
+        If X_valid is not None, we will also return the values of the
+        objective function evaluated with those validation samples.
+        Those values will be the onces according to which we will
+        decide to stop or not the descent with the train_stddev values.
         """
 
         # If we were passed the argument "auto", we have to replace the
@@ -149,32 +153,58 @@ class DAE(object):
                 print "Exiting."
                 quit()
 
-        seq_mean_best_U_q = []
+        # at some point we might want to decide to
+        # record all the best_q for the sequence
+        seq_train_mean_best_U_q = []
+        seq_valid_mean_best_U_q = []
         i = 0
         for train_stddev in list_of_train_stddev:
 
             sys.stdout.write("Using train_stddev %f, " % train_stddev)
             noisy_X = X + np.random.normal(size = X.shape, scale = train_stddev)
-            (_, U_best_q) = self.fit(X, noisy_X, optimization_args)
-            sys.stdout.write("mean loss is %f" % (U_best_q / X.shape[0]))
+            (best_q, train_U_best_q_) = self.fit(X, noisy_X, optimization_args)
+
+            train_U_best_q = self.q_loss(best_q, X, noisy_X).sum()
+            # sanity check to make sure that we're evaluating this right
+            assert(abs(train_U_best_q - train_U_best_q_) < 1e-8)
+
+            train_mean_U_best_q = train_U_best_q / X.shape[0]
+            seq_train_mean_best_U_q.append(train_mean_U_best_q)
+            sys.stdout.write("train mean loss is %f" % (train_mean_U_best_q,))
             print ""
-            mean_U_best_q = U_best_q / X.shape[0]
 
-            if (early_termination_args.has_key('stop_if_loss_greater_than') and
-                early_termination_args['stop_if_loss_greater_than'][i] < mean_U_best_q):
-                # terminate the training at this point
-                seq_mean_best_U_q.append(mean_U_best_q)
-                # might as well pad the rest of the list to
-                # signify that we terminated early
-                while len(seq_mean_best_U_q) < len(list_of_train_stddev):
-                    seq_mean_best_U_q.append(np.nan)
-                return seq_mean_best_U_q
+            if not (X_valid == None):
+                noisy_X_valid = X_valid + np.random.normal(size = X_valid.shape, scale = train_stddev)
+                valid_U_best_q = self.q_loss(best_q, X_valid, noisy_X_valid).sum()
+                valid_mean_U_best_q = valid_U_best_q / X_valid.shape[0]
+                seq_valid_mean_best_U_q.append(valid_mean_U_best_q)
+                sys.stdout.write("valid mean loss is %f" % (valid_mean_U_best_q,))
+                print ""
 
-            seq_mean_best_U_q.append(mean_U_best_q)
+                # if we're dealing with a validation set, it will be the one used
+                # to determine the stopping point
+                if (early_termination_args.has_key('stop_if_loss_greater_than') and
+                early_termination_args['stop_if_loss_greater_than'][i] < valid_mean_U_best_q):
+                    break
+            else:
+                # if we don't have a validation set, then we'll use mean_U_best_q
+                # for the termination condition
+
+                if (early_termination_args.has_key('stop_if_loss_greater_than') and
+                    early_termination_args['stop_if_loss_greater_than'][i] < mean_U_best_q):
+                    break
+
             i += 1
         # end for
 
-        return seq_mean_best_U_q
+        # might as well pad the rest of the list to
+        # signify that we terminated early
+        while len(seq_train_mean_best_U_q) < len(list_of_train_stddev):
+            seq_train_mean_best_U_q.append(np.nan)
+        while len(seq_valid_mean_best_U_q) < len(list_of_train_stddev):
+            seq_valid_mean_best_U_q.append(np.nan)
+        
+        return (seq_train_mean_best_U_q, seq_valid_mean_best_U_q)
 
 def main():
     pass

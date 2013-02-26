@@ -5,7 +5,8 @@ import sys, os, time
 
 import gaussian_mixture_tools
 
-from . import gyom_utils
+import refactor_gp
+import refactor_gp.gyom_utils
 from gyom_utils import conj
 
 

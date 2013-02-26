@@ -4,7 +4,7 @@ import numpy as np
 import os, sys, time
 
 def usage():
-    print "-- python train_dae.py --n_hiddens= --maxiter=50 --lbfgs_rank=20 --act_func='[\"tanh\", \"sigmoid\"]' --noise_stddevs='[1.0, 0.3, 0.1, 0.03, 0.01, 0.003, 0.0001]' --train_samples_pickle=\"/u/alaingui/Documents/blah/3493/train_samples.pkl\" --output_dir=/u/alaingui/Documents/tmp/trained_dae_294343"
+    print "-- python train_dae.py --n_hiddens= --maxiter=50 --lbfgs_rank=20 --act_func='[\"tanh\", \"sigmoid\"]' --noise_stddevs='[1.0, 0.3, 0.1, 0.03, 0.01, 0.003, 0.0001]' --train_samples_pickle=\"/u/alaingui/Documents/blah/3493/train_samples.pkl\" --valid_samples_pickle=\"/u/alaingui/Documents/blah/3493/valid_samples.pkl\" --output_dir=/u/alaingui/Documents/tmp/trained_dae_294343"
     print ""
     print "Some of the weirdness in the syntax is explained by the fact that we're using json for certain parameters."
 
@@ -23,7 +23,7 @@ def main(argv):
     import json
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hv", ["n_hiddens=", "maxiter=", "lbfgs_rank=", "act_func=", "noise_stddevs=", "train_samples_pickle=", "output_dir=", "want_early_termination="])
+        opts, args = getopt.getopt(argv[1:], "hv", ["n_hiddens=", "maxiter=", "lbfgs_rank=", "act_func=", "noise_stddevs=", "train_samples_pickle=", "valid_samples_pickle=", "output_dir=", "want_early_termination="])
     except getopt.GetoptError as err:
         # print help information and exit:
         print str(err) # will print something like "option -a not recognized"
@@ -36,6 +36,7 @@ def main(argv):
     act_func = None
     noise_stddevs = None
     train_samples_pickle = None
+    valid_samples_pickle = None
     output_dir = None
     want_early_termination = False
 
@@ -63,6 +64,8 @@ def main(argv):
                 noise_stddevs = [noise_stddevs]
         elif o in ("--train_samples_pickle"):
             train_samples_pickle = a
+        elif o in ("--valid_samples_pickle"):
+            valid_samples_pickle = a
         elif o in ("--output_dir"):
             output_dir = a
         elif o in ("--want_early_termination"):
@@ -73,9 +76,18 @@ def main(argv):
     #print "want_early_termination is %d" % want_early_termination
 
     assert os.path.exists(train_samples_pickle)
-    samples = cPickle.load(open(train_samples_pickle, 'rb'))
-    n_samples, n_inputs = samples.shape
+    train_samples = cPickle.load(open(train_samples_pickle, 'rb'))
+    _, n_inputs = train_samples.shape
 
+    if valid_samples_pickle:
+        # it's alright to omit the validation set,
+        # but if it's specified as argument, it has to be
+        # a legitimate pickle
+        assert os.path.exists(valid_samples_pickle)
+        valid_samples = cPickle.load(open(valid_samples_pickle, 'rb'))
+        assert train_samples.shape[1] == valid_samples.shape[1]
+    else:
+        valid_samples = None
 
     from dae_untied_weights import DAE_untied_weights
 
@@ -96,12 +108,24 @@ def main(argv):
     else:
         early_termination_args = {}
 
-    model_losses = mydae.fit_with_decreasing_noise(samples,
-                                                   noise_stddevs,
-                                                   {'method' : 'fmin_l_bfgs_b',
-                                                    'maxiter' : maxiter,
-                                                   'm':lbfgs_rank},
-                                                   early_termination_args)
+    (train_model_losses, valid_model_losses) = mydae.fit_with_decreasing_noise(train_samples,
+                                                                               noise_stddevs,
+                                                                               {'method' : 'fmin_l_bfgs_b',
+                                                                                'maxiter' : maxiter,
+                                                                                'm':lbfgs_rank},
+                                                                               early_termination_args,
+                                                                               X_valid = valid_samples)
+    # We'll simplify some of the later steps by simply
+    # referring to "model_losses" for the version that
+    # was used. This will be used later when loading
+    # the model in sample_dae.py, but it's not actually
+    # necessary since we could also reason things out
+    # from the np.nan present.
+    if not (valid_samples == None):
+        model_losses = valid_model_losses
+    else:
+        model_losses = train_model_losses
+
     end_time = time.time()
     computational_cost_in_seconds = int(end_time - start_time)
     print "Training took %d seconds." % (computational_cost_in_seconds,)
@@ -130,6 +154,8 @@ def main(argv):
                      'noise_stddevs':noise_stddevs,
                      'train_samples_pickle':train_samples_pickle,
                      'model_losses':model_losses,
+                     'train_model_losses':train_model_losses,
+                     'valid_model_losses':valid_model_losses,
                      'computational_cost_in_seconds':computational_cost_in_seconds,
                      'early_termination_occurred':early_termination_occurred}
 
