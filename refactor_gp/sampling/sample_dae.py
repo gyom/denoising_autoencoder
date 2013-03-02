@@ -200,12 +200,13 @@ def main(argv):
     sampling_extra_details['thinning_factor'] = thinning_factor
     sampling_extra_details['burn_in'] = burn_in
     sampling_extra_details['proposal_stddev'] = proposal_stddev
+    sampling_extra_details['langevin_lambda'] = langevin_lambda
     sampling_extra_details['n_E_approx_path'] = n_E_approx_path
 
     sampling_extra_pickle_file = os.path.join(output_dir, "sampling_extra_details.pkl")
     sampling_extra_json_file = os.path.join(output_dir, "sampling_extra_details.json")
-    cPickle.dump(extra_details, open(sampling_extra_pickle_file, "w"))
-    json.dump(extra_details, open(sampling_extra_json_file, "w"))
+    cPickle.dump(sampling_extra_details, open(sampling_extra_pickle_file, "w"))
+    json.dump(sampling_extra_details, open(sampling_extra_json_file, "w"))
     print "Wrote %s" % (sampling_extra_pickle_file,)
     print "Wrote %s" % (sampling_extra_json_file,)
 

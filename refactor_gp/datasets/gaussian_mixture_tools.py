@@ -5,8 +5,9 @@ import scitools
 
 import sys, os, time
 
-from . import gyom_utils
-from gyom_utils import conj
+import refactor_gp
+import refactor_gp.gyom_utils
+from   refactor_gp.gyom_utils import conj
 
 
 def generate_a_covariance_matrix(target_v, ratio_of_other_eigenvalues):
@@ -112,6 +113,31 @@ def sample_from_mixture(component_means, component_covariances, n_samples):
         samples[k,:] = np.random.multivariate_normal(mean=component_means[c,:], cov=component_covariances[c,:,:])
         
     return (samples, component_indices)
+
+
+# TODO : IMPLEMENT THIS !!
+def pdf(sample, component_means, component_covariances):
+
+    assert component_means != None
+    assert component_covariances != None
+
+    (n_components, d) = component_means.shape
+    (n_components1, d1, d2) = component_covariances.shape
+    assert n_components == n_components1
+    assert d == d1
+    assert d == d2
+
+    samples = np.zeros((n_samples, d))
+    component_indices = np.zeros((n_samples,))
+    for k in np.arange(n_samples):
+        c = np.random.randint(n_components)
+        component_indices[k] = c
+        samples[k,:] = np.random.multivariate_normal(mean=component_means[c,:], cov=component_covariances[c,:,:])
+        
+    return (samples, component_indices)
+
+
+
 
 
 # If this is called, we'll just run a sanity check.

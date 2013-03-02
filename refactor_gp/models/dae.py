@@ -16,6 +16,10 @@ import scipy
 from theano import *
 import theano.tensor as T
 
+import refactor_gp
+import refactor_gp.gyom_utils
+from   refactor_gp.gyom_utils import conj
+
 class DAE(object):
 
     #def __init__(self):
@@ -120,7 +124,12 @@ class DAE(object):
     def fit_with_decreasing_noise(self, X, list_of_train_stddev,
                                   optimization_args, early_termination_args = {}, X_valid = None):
         """
-        The 'optimization_args' filters through to the 'fit' function unchanged
+        The 'optimization_args' filters through to the 'fit' function almost unchanged.
+
+        There is the option of adding a a special provision
+        for it's 'maxiter' entry when we get a list.
+        In such a situation, we use one value of maxiter
+        from the list for each value of list_of_train_stddev.
 
         The 'early_termination_args' is optional. It provides a way to
         stop the training if we determine that we started in a state
@@ -162,7 +171,14 @@ class DAE(object):
 
             sys.stdout.write("Using train_stddev %f, " % train_stddev)
             noisy_X = X + np.random.normal(size = X.shape, scale = train_stddev)
-            (best_q, train_U_best_q_) = self.fit(X, noisy_X, optimization_args)
+
+            if optimization_args.has_key('maxiter') and type(optimization_args['maxiter']) in [list, np.array]:
+                assert len(optimization_args['maxiter']) == len(list_of_train_stddev)
+                optimization_args0 = conj(optimization_args, "maxiter", optimization_args['maxiter'][i])
+            else:
+                optimization_args0 = optimization_args
+            (best_q, train_U_best_q_) = self.fit(X, noisy_X, optimization_args0)
+            #(best_q, train_U_best_q_) = self.fit(X, noisy_X, optimization_args)
 
             train_U_best_q = self.q_loss(best_q, X, noisy_X).sum()
             # sanity check to make sure that we're evaluating this right
@@ -203,8 +219,25 @@ class DAE(object):
             seq_train_mean_best_U_q.append(np.nan)
         while len(seq_valid_mean_best_U_q) < len(list_of_train_stddev):
             seq_valid_mean_best_U_q.append(np.nan)
-        
-        return (seq_train_mean_best_U_q, seq_valid_mean_best_U_q)
+
+
+        # Now we want to recompute the model losses for all the values of
+        # the train_stddev, but using the final parameters best_q.
+        # This will be used as an addition quality evaluation to determine
+        # how the DAE treats data that's relatively far from the manifold
+        # once it's done training.
+        # It might be even more informative than the validation losses.
+        if not (X_valid == None):
+            nreps = 10
+            seq_valid_mean_U_final_best_q = [np.array([self.q_loss(best_q,
+                                                                   X_valid,
+                                                                   X_valid + np.random.normal(size = X_valid.shape, scale = train_stddev)).sum() / X_valid.shape[0]
+                                                       for _ in range(nreps)]).mean()
+                                             for train_stddev in list_of_train_stddev]
+        else:
+            seq_valid_mean_U_final_best_q = None
+
+        return (seq_train_mean_best_U_q, seq_valid_mean_best_U_q, seq_valid_mean_U_final_best_q)
 
 def main():
     pass

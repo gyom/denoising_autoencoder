@@ -9,25 +9,17 @@ import scipy
 # it outputs samples with the correct asymptotic distribution.
 ##############
 
-def sample_chain(E, x0, symmetric_proposal, N, thinning_factor = 1, burn_in = 0, grad_E = None, asymmetric_proposal = None):
+def sample_chain(x0, N,
+                 energy_difference, proposal_stddev,
+                 thinning_factor = 1, burn_in = 0):
     """
-    Will sample N values for the chain starting with x0.
-    The energy function is given by E(...) which takes a
-    vector similar to x0 as argument.
+    Vanilla Monte Carlo Markov Chain that proposes changes
+    according to isotropic a Normal distribution N(0, proposal_stddev).
 
-    'symmetric_proposal' is a function that yields the
-    next position proposed. It is assumed to be symmetrical
-    because we don't compensate in the ratio.
-
-    'grad_E' is the gradient of the energy function.
-    It is used as an approximate replacement when
-    the argument 'E' is set to be None.
-
-    'asymmetric_proposal' is a function that yields a pair
-    that contains the next proposed state and the value of
-    log q( current_x | proposed_x ) - log q( proposed_x | current_x )
-    which can be included directly in the computation of the
-    acceptance criterion
+    This makes absolutely no use of the fact that we
+    are dealing with an autoencoder apart from the
+    fact that the energy_difference function is usually
+    meant to be obtained from a DAE's reconstruction function.
     """
 
     if len(x0.shape) != 1:
@@ -36,37 +28,13 @@ def sample_chain(E, x0, symmetric_proposal, N, thinning_factor = 1, burn_in = 0,
     if thinning_factor < 1:
         error("You misunderstood the thinning_factor. It should be 1 for no thinning, and 32 if we want one out of every 32 samples.")
 
-    def approximate_energy_difference(proposed_x, current_x):
-        return grad_E(current_x).dot(proposed_x - current_x)
-
-    def exact_energy_difference(proposed_x, current_x):
-        return E(proposed_x) - E(current_x)
-
-
-    if E == None:
-        if grad_E == None:
-            error("If you don't specify the energy function, you need to at least provide the gradient of the energy function.")
-        else:
-            energy_difference = approximate_energy_difference
-    else:
-        # This would be the regular branch executed when
-        # using Monte Carlo.
-        energy_difference = exact_energy_difference
-
-    if symmetric_proposal == None:
-        if asymmetric_proposal == None:
-            error("You need to specify either a symmetric or an asymmetric prosal.")
-        else:
-            proposal = asymmetric_proposal
-    else:
-        proposal = lambda current_x: (symmetric_proposal(current_x), 0.0)
+    proposal = lambda current_x: current_x + np.random.normal(size=current_x.shape, scale=proposal_stddev)
 
 
     def iterate_N_times(current_x, energy_difference, N):
         for _ in np.arange(N):
-            (proposed_x, asymmetric_correction_log_factor) = proposal(current_x)
-            #proposed_x = symmetric_proposal(current_x)
-            loga = - energy_difference(proposed_x, current_x) + asymmetric_correction_log_factor
+            proposed_x = proposal(current_x)
+            loga = - energy_difference(proposed_x, current_x)
             if loga >= 0 or loga >= np.log(np.random.uniform(0,1)):
                 # accepted !
                 current_x = proposed_x
@@ -96,7 +64,6 @@ def sample_chain(E, x0, symmetric_proposal, N, thinning_factor = 1, burn_in = 0,
         current_x = iterate_N_times(current_x, energy_difference, thinning_factor)
         # collect sample after running through the thinning iterations
         samples_list.append(current_x)
-
 
     samples = np.vstack(samples_list)
     acceptance_ratio = iterate_N_times.accepted_counter * 1.0 / (iterate_N_times.accepted_counter + iterate_N_times.rejected_counter)

@@ -108,13 +108,17 @@ def main(argv):
     else:
         early_termination_args = {}
 
-    (train_model_losses, valid_model_losses) = mydae.fit_with_decreasing_noise(train_samples,
-                                                                               noise_stddevs,
-                                                                               {'method' : 'fmin_l_bfgs_b',
-                                                                                'maxiter' : maxiter,
-                                                                                'm':lbfgs_rank},
-                                                                               early_termination_args,
-                                                                               X_valid = valid_samples)
+    (train_model_losses, valid_model_losses, post_valid_model_losses) = mydae.fit_with_decreasing_noise(train_samples,
+                                                                                                        noise_stddevs,
+                                                                                                        {'method' : 'fmin_l_bfgs_b',
+                                                                                                         'maxiter' : maxiter,
+                                                                                                         'm':lbfgs_rank},
+                                                                                                        early_termination_args,
+                                                                                                        X_valid = valid_samples)
+    #print "post_valid_model_losses"
+    #print post_valid_model_losses
+    #print
+
     # We'll simplify some of the later steps by simply
     # referring to "model_losses" for the version that
     # was used. This will be used later when loading
@@ -156,6 +160,7 @@ def main(argv):
                      'model_losses':model_losses,
                      'train_model_losses':train_model_losses,
                      'valid_model_losses':valid_model_losses,
+                     'post_valid_model_losses':post_valid_model_losses,
                      'computational_cost_in_seconds':computational_cost_in_seconds,
                      'early_termination_occurred':early_termination_occurred}
 

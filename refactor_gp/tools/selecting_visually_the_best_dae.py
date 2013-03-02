@@ -1,0 +1,95 @@
+
+
+
+acceptable = [s for s in """
+000000
+000001
+000002
+000003
+000004
+000005
+000006
+000007
+000008
+000010
+000011
+000012
+000013
+000014
+000015
+000017
+000018
+000019
+000023
+000025
+000026
+000028
+000029
+000030
+000032
+000034
+000035
+000036
+000038
+000040
+000042
+000043
+000045
+000049
+000050
+000051
+000053
+000057
+000059
+000064
+000065
+000066
+000067
+000071
+000072
+000073
+000074
+000078
+000079
+000081
+000082
+000083
+000086
+000089
+000090
+000096
+000097
+000098
+000099
+000101
+000104
+000106
+000107
+000112
+000113
+000114
+000115
+000123
+000128
+000129
+000130
+000131
+000137
+000138
+000139
+000140
+000142
+""".split("\n") if len(s) > 0]
+
+
+import subprocess
+import cPickle
+
+dir = "/data/lisatmp2/alaingui/dae/dae_trained_models/gaussian_mixture_d2/experiment_11"
+list_files = sorted([e for e in subprocess.check_output("find %s -name extra_details.pkl" % (dir,), shell=True).split("\n") if len(e)>0])
+
+list_contents = [cPickle.load(open(f)) for f in list_files]
+
+list_contents_acc = [list_contents[int(s)] for s in acceptable]
+
+

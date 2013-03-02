@@ -46,6 +46,7 @@ def usage():
 def main(argv):
     """
        n_train
+       n_valid
        n_test
        d is the dimension of the samples. Should be higher than 2 and preferable 10 or more.
        mixing_prop controls how much of the vector v_t we mix in with the proposal for v_{t+1}
@@ -58,7 +59,7 @@ def main(argv):
     import cPickle
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hv", ["d=", "n_train=", "n_test=", "ratio_eigvals=", "n_components=", "output_dir="])
+        opts, args = getopt.getopt(sys.argv[1:], "hv", ["d=", "n_train=", "n_valid=", "n_test=", "ratio_eigvals=", "n_components=", "output_dir="])
     except getopt.GetoptError as err:
         # print help information and exit:
         print str(err) # will print something like "option -a not recognized"
@@ -66,6 +67,7 @@ def main(argv):
         sys.exit(2)
 
     n_train = None
+    n_valid = None
     n_test = None
     d = None
     ratio_eigvals = 1.0
@@ -80,6 +82,8 @@ def main(argv):
             sys.exit()
         elif o in ("--n_train"):
             n_train = int(a)
+        elif o in ("--n_valid"):
+            n_valid = int(a)
         elif o in ("--n_test"):
             n_test = int(a)
         elif o in ("--d"):
@@ -94,6 +98,7 @@ def main(argv):
             assert False, "unhandled option"
  
     assert n_train
+    assert n_valid
     assert n_test
     assert d
     assert n_components
@@ -105,7 +110,7 @@ def main(argv):
     assert component_means != None
     assert component_covariances != None
 
-    (samples, component_indices) = gaussian_mixture_tools.sample_from_mixture(component_means, component_covariances, n_train + n_test)
+    (samples, component_indices) = gaussian_mixture_tools.sample_from_mixture(component_means, component_covariances, n_train + n_valid + n_test)
     end_time = time.time()
     computational_cost_in_seconds = int(end_time - start_time)
     print "Sampling took %d seconds." % computational_cost_in_seconds
@@ -124,6 +129,7 @@ def main(argv):
                    'f_parameters':f_parameters,
                    'computational_cost_in_seconds':computational_cost_in_seconds}
 
+    ### TRAIN ###
 
     train_samples = samples[0:n_train,:]
     train_component_indices = component_indices[0:n_train]
@@ -138,9 +144,25 @@ def main(argv):
     print "wrote " + train_samples_filename
     print "wrote " + train_samples_extra_filename
 
+    ### VALID ###
 
-    test_samples = samples[n_train:(n_train + n_test),:]
-    test_component_indices= component_indices[n_train:(n_train + n_test)]
+    valid_samples = samples[n_train:(n_train + n_valid),:]
+    valid_component_indices = component_indices[n_train:(n_train + n_valid)]
+    valid_samples_filename = os.path.join(output_dir, "valid_samples.pkl")
+    valid_samples_extra_filename = os.path.join(output_dir, "valid_samples_extra.pkl")
+
+    cPickle.dump(valid_samples, open(valid_samples_filename, "w"))
+    cPickle.dump(conj(conj(extra_props,
+                           ('n', n_valid)),
+                      ('component_indices', valid_component_indices)),
+                 open(valid_samples_extra_filename, "w"))
+    print "wrote " + valid_samples_filename
+    print "wrote " + valid_samples_extra_filename
+
+    ### TEST ###
+
+    test_samples = samples[(n_train + n_valid):(n_train + n_valid + n_test),:]
+    test_component_indices= component_indices[(n_train + n_valid):(n_train + n_valid + n_test)]
     test_samples_filename  = os.path.join(output_dir, "test_samples.pkl")
     test_samples_extra_filename  = os.path.join(output_dir, "test_samples_extra.pkl")
 

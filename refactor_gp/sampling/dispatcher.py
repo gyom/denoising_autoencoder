@@ -3,14 +3,14 @@ import numpy as np
 import time
 import scipy
 
-from gyom_utils import get_dict_key_or_default
-
 import refactor_gp
 import refactor_gp.sampling
 import refactor_gp.sampling.metropolis_hastings.langevin as langevin
 import refactor_gp.sampling.metropolis_hastings.vanilla as vanilla
 import refactor_gp.sampling.metropolis_hastings.svd as svd
 
+import refactor_gp.gyom_utils
+from refactor_gp.gyom_utils import get_dict_key_or_default
 
 """
 if not E == None:
@@ -94,13 +94,16 @@ def mcmc_generate_samples(sampling_options):
         d = proposed_x.shape[0]
         t = np.tile(np.linspace(0,1,n_E_approx_path).reshape((-1,1)),
                     (1,d))
-        grad_E_path = (1 - t) * current_x.reshape((1,-1)) + t * proposed_x.reshape((1,-1))
-
+        path = (1 - t) * current_x.reshape((1,-1)) + t * proposed_x.reshape((1,-1))
+        # could be turned into something better if we had a vectorial
+        # implementation of grad_E
+        grad_E_path = np.vstack( [grad_E(v) for v in path] ).mean(axis=0)
+        assert grad_E_path.shape == (d,)
         # debug
         #print "%f, %f" % (grad_E_path.dot(proposed_x - current_x).mean(),
         #                  approximate_energy_difference(proposed_x, current_x) )
 
-        return grad_E_path.dot(proposed_x - current_x).mean()
+        return grad_E_path.dot(proposed_x - current_x)
 
     samples_for_all_chains = np.zeros((n_chains, n_samples, d))
     acceptance_ratio_list = []
@@ -108,17 +111,16 @@ def mcmc_generate_samples(sampling_options):
 
     for c in np.arange(n_chains):
 
-        #if mcmc_method == 'metropolis_hastings_E':
-        #    assert proposal_stddev > 0.0
-        #    symmetric_proposal = lambda x: x + np.random.normal(size=x.shape, scale = proposal_stddev)
-        #    (X, acceptance_ratio) = run_chain_with_energy(E, x0[c,:], symmetric_proposal, n_samples, thinning_factor = thinning_factor, burn_in = burn_in)
-        #
-        #elif mcmc_method == 'metropolis_hastings_grad_E':
-        #    assert proposal_stddev > 0.0
-        #    symmetric_proposal = lambda x: x + np.random.normal(size=x.shape, scale = proposal_stddev)
-        #    (X, acceptance_ratio) = run_chain_with_energy(None, x0[c,:], symmetric_proposal, n_samples, thinning_factor = thinning_factor, burn_in = burn_in, grad_E = grad_E)
-        #
-        if mcmc_method == 'langevin_grad_E':
+        if mcmc_method == 'MH_grad_E':
+            assert proposal_stddev > 0
+
+            if n_E_approx_path and n_E_approx_path > 1:
+                energy_difference = approximate_energy_difference_by_path_integration
+            else:
+                energy_difference = approximate_energy_difference
+
+            (X, acceptance_ratio) = vanilla.sample_chain(x0[c,:], n_samples, energy_difference, proposal_stddev, thinning_factor = thinning_factor, burn_in = burn_in)
+        elif mcmc_method == 'langevin_grad_E':
             assert r
             assert r_prime
             assert langevin_lambda > 0
@@ -129,19 +131,7 @@ def mcmc_generate_samples(sampling_options):
                 energy_difference = approximate_energy_difference
 
             (X, acceptance_ratio) = langevin.sample_chain(x0[c,:], n_samples, energy_difference, langevin_lambda, r, r_prime, thinning_factor = thinning_factor, burn_in = burn_in, accept_all_proposals = True)
-        #
-        #elif mcmc_method == 'MH_langevin_E':
-        #
-        #    # grad_E is needed to define the perfect reconstruction function
-        #    # E is used for the Metropolis-Hastings sampling
-        #
-        #    # remember that we have a minus here because it's d log p(x) / dx
-        #    # which corresponds to - dE(x) / dx
-        #    r = lambda x: x - langevin_lambda * grad_E(x)
-        #   (X, acceptance_ratio) = run_chain_with_langevin_proposals(x0[c,:], n_samples, langevin_lambda, E = E, thinning_factor = thinning_factor, burn_in = burn_in, r = r)
-        #
-        #    #(X, acceptance_ratio) = metropolis_hastings_sampler.run_chain_with_energy(ninja_star_distribution.E, x0, None, n_samples, thinning_factor = thinning_factor, burn_in = burn_in, asymmetric_proposal = asymmetric_proposal)
-        #
+
         elif mcmc_method == 'MH_langevin_grad_E':
             assert r
             assert r_prime
