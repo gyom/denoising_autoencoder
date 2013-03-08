@@ -28,30 +28,45 @@ def sample_chain(x0, N,
     train_stddev = noise_levels["train_stddev"]
 
     if noise_levels.has_key("langevin_stddev") and noise_levels.has_key("langevin_beta"):
-        print "You should NOT specify both langevin_stddev and langevin_beta, but we'll accept this only if the values are compatible."
         langevin_stddev = noise_levels["langevin_stddev"]
         langevin_beta = noise_levels["langevin_beta"]
-        assert langevin_stddev == train_stddev**2 / (2*langevin_beta)
 
     elif noise_levels.has_key("langevin_stddev") and not noise_levels.has_key("langevin_beta"):
         langevin_stddev = noise_levels["langevin_stddev"]
-        langevin_beta = train_stddev**2 / (2*langevin_stddev**2)
+        temperature = 1.0
+        langevin_beta = langevin_stddev**2 / (2*temperature*train_stddev**2)
 
     elif noise_levels.has_key("langevin_beta") and not noise_levels.has_key("langevin_stddev"):
         langevin_beta = noise_levels["langevin_beta"]
-        langevin_stddev = train_stddev**2 / (2*langevin_beta)
+        temperature = 1.0
+        langevin_stddev = np.sqrt(2*temperature*langevin_beta)*train_stddev
 
     else:
         # we've got nothing, so let's pick beta=1
         langevin_beta = 1.0
-        langevin_stddev = train_stddev**2 / (2*langevin_beta)
+        temperature = 1.0
+        langevin_stddev = np.sqrt(2*temperature*langevin_beta)*train_stddev
 
     assert train_stddev > 0
     assert langevin_stddev > 0
     assert not (langevin_beta == 0.0)
     if langevin_beta < 0.0 or 1.0 < langevin_beta:
-        print "This is not necessarily an error, but it is a bit strange to be using a beta outside of the range [0,1]."
+        print "This is not **NECESSARILY** an error, but it is a bit strange to be using a beta outside of the range [0,1]."
 
+    temperature = langevin_stddev**2 / ( 2 * langevin_beta * train_stddev**2 )
+    print "==========================="
+    print "With your current setup, you have that the sampling procedure scales as follows."
+    print ""
+    print "train_stddev : %f" % train_stddev
+    print "langevin_stddev : %f" % langevin_stddev
+    print 
+    print "langevin_beta : %f" % langevin_beta
+    print "temperature : %f" % temperature
+    print "==========================="
+    noise_levels = {'train_stddev':train_stddev,
+                    'langevin_stddev':langevin_stddev,
+                    'langevin_beta':langevin_beta,
+                    'temperature':temperature}
 
     def langevin_proposal(current_x, preimage_current_x):
 
@@ -67,7 +82,7 @@ def sample_chain(x0, N,
 
         d = current_x.shape[0]
         preimage_proposed_x = current_x + np.random.normal(size=(d,), scale=langevin_stddev)
-        proposed_x = (1-langevin_beta) * current_x + langevin_beta * r(preimage_proposed_x)
+        proposed_x = (1-langevin_beta) * preimage_proposed_x + langevin_beta * r(preimage_proposed_x)
 
         # Now we need to compute
         # log q( current_x | proposed_x ) - log q( proposed_x | current_x )
@@ -130,4 +145,4 @@ def sample_chain(x0, N,
     samples = np.vstack(samples_list)
     acceptance_ratio = iterate_N_times.accepted_counter * 1.0 / (iterate_N_times.accepted_counter + iterate_N_times.rejected_counter)
 
-    return (samples, acceptance_ratio)
+    return (samples, acceptance_ratio, noise_levels)

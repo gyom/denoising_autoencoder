@@ -170,6 +170,7 @@ def main(argv):
     #                elapsed_time
     #                proposals_per_second
     #                acceptance_ratio
+    #                noise_levels
 
     print ""
     print "Sampling took %d seconds." % (res['elapsed_time'],)

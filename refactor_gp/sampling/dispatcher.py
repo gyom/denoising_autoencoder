@@ -12,19 +12,6 @@ import refactor_gp.sampling.metropolis_hastings.svd as svd
 import refactor_gp.gyom_utils
 from refactor_gp.gyom_utils import get_dict_key_or_default
 
-"""
-if not E == None:
-    # This would be the regular branch executed when
-    # using Monte Carlo.
-    energy_difference = exact_energy_difference
-elif E == None and not grad_E == None:
-    energy_difference = approximate_energy_difference
-else:
-    raise("Unrecognized setup.")
-"""
-
-
-
 
 def mcmc_generate_samples(sampling_options):
 
@@ -144,7 +131,7 @@ def mcmc_generate_samples(sampling_options):
             else:
                 energy_difference = approximate_energy_difference
 
-            (X, acceptance_ratio) = langevin.sample_chain(x0[c,:], n_samples, energy_difference, noise_levels, r, r_prime, thinning_factor = thinning_factor, burn_in = burn_in, accept_all_proposals = True)
+            (X, acceptance_ratio, noise_levels) = langevin.sample_chain(x0[c,:], n_samples, energy_difference, noise_levels, r, r_prime, thinning_factor = thinning_factor, burn_in = burn_in, accept_all_proposals = True)
 
         elif mcmc_method == 'MH_langevin_grad_E':
             assert r
@@ -160,7 +147,7 @@ def mcmc_generate_samples(sampling_options):
             else:
                 energy_difference = approximate_energy_difference
 
-            (X, acceptance_ratio) = langevin.sample_chain(x0[c,:], n_samples, energy_difference, noise_levels, r, r_prime, thinning_factor = thinning_factor, burn_in = burn_in)
+            (X, acceptance_ratio, noise_levels) = langevin.sample_chain(x0[c,:], n_samples, energy_difference, noise_levels, r, r_prime, thinning_factor = thinning_factor, burn_in = burn_in)
 
         elif mcmc_method == "MH_svd_grad_E":
             assert f_prime
@@ -177,7 +164,7 @@ def mcmc_generate_samples(sampling_options):
             else:
                 energy_difference = approximate_energy_difference
 
-            (X, acceptance_ratio) = svd.sample_chain(x0[c,:], n_samples, energy_difference, noise_levels, r, r_prime, f_prime, thinning_factor = thinning_factor, burn_in = burn_in)
+            (X, acceptance_ratio, noise_levels) = svd.sample_chain(x0[c,:], n_samples, energy_difference, noise_levels, r, r_prime, f_prime, thinning_factor = thinning_factor, burn_in = burn_in)
         else:
             raise("Unrecognized value for parameter 'mcmc_method' : %s" % (mcmc_method,))
 
@@ -199,7 +186,8 @@ def mcmc_generate_samples(sampling_options):
     return {'samples': samples_for_all_chains,
             'elapsed_time':sampling_end_time - sampling_start_time,
             'proposals_per_second':proposals_per_second,
-            'acceptance_ratio':combined_acceptance_ratio    }
+            'acceptance_ratio':combined_acceptance_ratio,
+            'noise_levels':noise_levels}
 
 
     
