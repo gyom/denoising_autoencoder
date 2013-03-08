@@ -15,12 +15,12 @@ if not r_server.ping():
 # - the output_dir prefix
 # - probably stuff like n_hiddens to reflect better the dimensionality
 
-d = 2
+d = 10
 training_script_path = "/u/alaingui/umontreal/denoising_autoencoder/refactor_gp/models/train_dae.py"
 train_samples_pickle = "/data/lisatmp2/alaingui/dae/datasets/gaussian_mixture/d%d_eig0.1_comp25_001/train_samples.pkl" % d
 valid_samples_pickle = "/data/lisatmp2/alaingui/dae/datasets/gaussian_mixture/d%d_eig0.1_comp25_001/valid_samples.pkl" % d
 
-experiment_name = "experiment_12"
+experiment_name = "experiment_14"
 
 if d == 2:
 
@@ -32,23 +32,22 @@ if d == 2:
 
     n_reps = 4
 
-    noise_stddevs = [np.exp(s*np.log(10.0)) for s in np.linspace(1,0,10)] + [np.exp(s*np.log(10.0)) for s in np.linspace(0,-2,20)]
+    noise_stddevs = [np.exp(s*np.log(10.0)) for s in np.linspace(1,0,10)] + [np.exp(s*np.log(10.0)) for s in np.linspace(0,-1,20)]
     #noise_stddevs = [np.exp(s*np.log(10.0)) for s in np.linspace(0,-1,50)]
     # noise_stddevs = [1.0, 0.3, 0.1, 0.03, 0.01, 0.003, 0.0001]
     want_early_termination = True
 
 elif d == 10:
-    #L_n_hiddens = [10,25]
-    L_n_hiddens = [8, 16, 32, 64]
-    L_maxiter = [100,500]
-    L_lbfgs_rank = [1,4,10]
+
+    L_n_hiddens = [64, 128, 256]
+    L_maxiter = [10000]
+    L_lbfgs_rank = [4,10]
     L_act_func = [ '["tanh", "tanh"]', '["tanh", "id"]']
     #L_act_func = ['["tanh", "tanh"]', '["sigmoid", "tanh"]', '["tanh", "sigmoid"]']
 
-    n_reps = 4
+    n_reps = 2
 
-    noise_stddevs = [np.exp(s*np.log(10.0)) for s in np.linspace(0,-1,50)]
-    # noise_stddevs = [1.0, 0.3, 0.1, 0.03, 0.01, 0.003, 0.0001]
+    noise_stddevs = [np.exp(s*np.log(10.0)) for s in np.linspace(1,0,5)] + [np.exp(s*np.log(10.0)) for s in np.linspace(0,-2,20)]
     want_early_termination = True
 
 elif d == 100:

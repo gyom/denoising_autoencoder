@@ -28,11 +28,13 @@ else:
 
 def mcmc_generate_samples(sampling_options):
 
+    train_stddev    = get_dict_key_or_default(sampling_options, 'train_stddev', None, True)
     proposal_stddev = get_dict_key_or_default(sampling_options, 'proposal_stddev', None)
     n_samples       = get_dict_key_or_default(sampling_options, 'n_samples',       None, True)
     thinning_factor = get_dict_key_or_default(sampling_options, 'thinning_factor', 100)
     burn_in         = get_dict_key_or_default(sampling_options, 'burn_in',         n_samples * thinning_factor / 10)
-    langevin_lambda = get_dict_key_or_default(sampling_options, 'langevin_lambda', None)
+    langevin_stddev = get_dict_key_or_default(sampling_options, 'langevin_stddev', None)
+    langevin_beta   = get_dict_key_or_default(sampling_options, 'langevin_beta',   None)
     mcmc_method     = get_dict_key_or_default(sampling_options, 'mcmc_method',     None, True)
     x0              = get_dict_key_or_default(sampling_options, 'x0',              np.random.normal(size=(2,)))
     n_chains        = get_dict_key_or_default(sampling_options, 'n_chains',        None)
@@ -50,6 +52,13 @@ def mcmc_generate_samples(sampling_options):
     r               = get_dict_key_or_default(sampling_options, 'r',               None)
     r_prime         = get_dict_key_or_default(sampling_options, 'r_prime',         None)
 
+
+    # In the process of cleaning up that mess of having two different names
+    # for basically the same thing.
+    #if (proposal_stddev == None) and not (langevin_stddev == None):
+    #    proposal_stddev = langevin_stddev
+    #elif (langevin_stddev == None) and not (proposal_stddev == None):
+    #    langevin_stddev = proposal_stddev
 
     # Run a sanity check to be sure that E and grad_E take the correct input dimension given by x0.
     # This could later be used to poke around to see if E and grad_E are vectorial or not.
@@ -105,6 +114,7 @@ def mcmc_generate_samples(sampling_options):
 
         return grad_E_path.dot(proposed_x - current_x)
 
+
     samples_for_all_chains = np.zeros((n_chains, n_samples, d))
     acceptance_ratio_list = []
     sampling_start_time = time.time()
@@ -123,39 +133,51 @@ def mcmc_generate_samples(sampling_options):
         elif mcmc_method == 'langevin_grad_E':
             assert r
             assert r_prime
-            assert langevin_lambda > 0
+            noise_levels = {'train_stddev':train_stddev}
+            if not langevin_stddev == None:
+                noise_levels["langevin_stddev"] = langevin_stddev
+            if not langevin_beta == None:
+                noise_levels["langevin_beta"] = langevin_beta
 
             if n_E_approx_path and n_E_approx_path > 1:
                 energy_difference = approximate_energy_difference_by_path_integration
             else:
                 energy_difference = approximate_energy_difference
 
-            (X, acceptance_ratio) = langevin.sample_chain(x0[c,:], n_samples, energy_difference, langevin_lambda, r, r_prime, thinning_factor = thinning_factor, burn_in = burn_in, accept_all_proposals = True)
+            (X, acceptance_ratio) = langevin.sample_chain(x0[c,:], n_samples, energy_difference, noise_levels, r, r_prime, thinning_factor = thinning_factor, burn_in = burn_in, accept_all_proposals = True)
 
         elif mcmc_method == 'MH_langevin_grad_E':
             assert r
             assert r_prime
-            assert langevin_lambda > 0
+            noise_levels = {'train_stddev':train_stddev}
+            if not langevin_stddev == None:
+                noise_levels["langevin_stddev"] = langevin_stddev
+            if not langevin_beta == None:
+                noise_levels["langevin_beta"] = langevin_beta
 
             if n_E_approx_path and n_E_approx_path > 1:
                 energy_difference = approximate_energy_difference_by_path_integration
             else:
                 energy_difference = approximate_energy_difference
 
-            (X, acceptance_ratio) = langevin.sample_chain(x0[c,:], n_samples, energy_difference, langevin_lambda, r, r_prime, thinning_factor = thinning_factor, burn_in = burn_in)
+            (X, acceptance_ratio) = langevin.sample_chain(x0[c,:], n_samples, energy_difference, noise_levels, r, r_prime, thinning_factor = thinning_factor, burn_in = burn_in)
 
         elif mcmc_method == "MH_svd_grad_E":
             assert f_prime
             assert r_prime
             assert r
-            assert proposal_stddev > 0
+            noise_levels = {'train_stddev':train_stddev}
+            if not langevin_stddev == None:
+                noise_levels["langevin_stddev"] = langevin_stddev
+            if not langevin_beta == None:
+                noise_levels["langevin_beta"] = langevin_beta
 
             if n_E_approx_path and n_E_approx_path > 1:
                 energy_difference = approximate_energy_difference_by_path_integration
             else:
                 energy_difference = approximate_energy_difference
 
-            (X, acceptance_ratio) = svd.sample_chain(x0[c,:], n_samples, energy_difference, proposal_stddev = proposal_stddev, r = r, r_prime = r_prime, f_prime = f_prime, thinning_factor = thinning_factor, burn_in = burn_in)
+            (X, acceptance_ratio) = svd.sample_chain(x0[c,:], n_samples, energy_difference, noise_levels, r, r_prime, f_prime, thinning_factor = thinning_factor, burn_in = burn_in)
         else:
             raise("Unrecognized value for parameter 'mcmc_method' : %s" % (mcmc_method,))
 

@@ -6,7 +6,7 @@ import cPickle
 #dir = "/data/lisatmp2/alaingui/dae/dae_trained_models/gaussian_mixture_d10/experiment_09"
 #dir = "/data/lisatmp2/alaingui/dae/dae_trained_models/gaussian_mixture_d100/experiment_01"
 
-dir = "/data/lisatmp2/alaingui/dae/dae_trained_models/gaussian_mixture_d2/experiment_12"
+dir = "/data/lisatmp2/alaingui/dae/dae_trained_models/gaussian_mixture_d10/experiment_13"
 list_files = sorted([e for e in subprocess.check_output("find %s -name extra_details.pkl" % (dir,), shell=True).split("\n") if len(e)>0])
 
 dir = "/data/lisatmp2/alaingui/dae/generated_samples/experiment_11_03"

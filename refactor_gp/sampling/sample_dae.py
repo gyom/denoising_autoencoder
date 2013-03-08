@@ -27,7 +27,7 @@ def main(argv):
     import json
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hv", ["pickled_dae_dir=", "mcmc_method=", "n_samples=", "thinning_factor=", "proposal_stddev=", "langevin_lambda=",  "output_dir=", "n_E_approx_path=", "want_overview_plots="])
+        opts, args = getopt.getopt(sys.argv[1:], "hv", ["pickled_dae_dir=", "mcmc_method=", "n_samples=", "thinning_factor=", "burn_in=", "proposal_stddev=", "langevin_stddev=", "langevin_beta=", "output_dir=", "n_E_approx_path=", "want_overview_plots="])
     except getopt.GetoptError as err:
         # print help information and exit:
         print str(err) # will print something like "option -a not recognized"
@@ -42,7 +42,8 @@ def main(argv):
     proposal_stddev = None
     output_dir = None
     n_E_approx_path = None
-    langevin_lambda = None
+    langevin_stddev = None
+    langevin_beta = None
     want_overview_plots = False
 
     verbose = False
@@ -62,8 +63,10 @@ def main(argv):
             thinning_factor = int(a)
         elif o in ("--burn_in"):
             burn_in = int(a)
-        elif o in ("--langevin_lambda"):
-            langevin_lambda = float(a)
+        elif o in ("--langevin_stddev"):
+            langevin_stddev = float(a)
+        elif o in ("--langevin_beta"):
+            langevin_beta = float(a)
         elif o in ("--proposal_stddev"):
             proposal_stddev = float(a)
         elif o in ("--n_E_approx_path"):
@@ -74,6 +77,10 @@ def main(argv):
             output_dir = a
         else:
             assert False, "unhandled option"
+
+    assert not (mcmc_method == None)
+    if mcmc_method in ['MH_langevin_grad_E', 'langevin_grad_E']:
+        assert not ((langevin_stddev == None) and (langevin_beta == None))
  
     #print "want_early_termination is %d" % want_early_termination
 
@@ -109,42 +116,28 @@ def main(argv):
     n_inputs = extra_details['n_inputs']
     n_hiddens = extra_details['n_hiddens']
 
-    train_noise_stddev = None
+    # Get the last value for which we don't have 'nan' as value.
+    train_stddev = None
     for (loss, noise_stddev) in zip(extra_details['model_losses'],
                                     extra_details['noise_stddevs']):
         if np.isnan(loss):
             break
         else:
-            train_noise_stddev = noise_stddev
+            train_stddev = noise_stddev
 
-    # At that point, langevin_lambda should be the associated
-    # value for that DAE that we loaded. If langevin_lambda is
-    # still None, it means that we've loaded a model that was
-    # not trained properly.
-    assert train_noise_stddev
-    print "Obtaining grad_E from r and the fact that train_noise_stddev %f" % (train_noise_stddev,)
+    assert train_stddev
+    print "Obtaining grad_E from r and the fact that train_stddev %f" % (train_stddev,)
 
     dae_params = read_parameters_from_dae(mydae)
     r = dae_params['r']
 
     # don't forget the minus sign here !
     # remember that r(x) - x is propto  -1 * dE/dx
-    grad_E = lambda x: -1*(r(x)-x) / train_noise_stddev
+    grad_E = lambda x: -1*(r(x)-x) / train_stddev
 
     # We always sample from the origin.
     x0 = np.zeros((n_inputs,))
 
-    if mcmc_method in ['MH_langevin_grad_E', 'langevin_grad_E']:
-        if not langevin_lambda:
-            print "We haven't received a value for the langevin_lambda so we'll use train_noise_stddev**2 == %f instead." % train_noise_stddev**2
-            langevin_lambda = train_noise_stddev**2
-        else:
-            print "Using langevin_lambda == %f. This should probably be equal or smaller than train_noise_stddev**2 == %f." % (langevin_lambda, train_noise_stddev**2)
-    else:
-        if langevin_lambda:
-            print "Conceptual error in the arguments. You don't need to specify langevin_lambda, but you did."
-            print "Check to see if the list of supported methods was extended without adding this into the verifications."
-            quit()
 
     sampling_options = {'x0':x0,
                         'f_prime':dae_params['f_prime'],
@@ -152,21 +145,25 @@ def main(argv):
                         'r_prime':dae_params['r_prime'],
                         'mcmc_method':mcmc_method,
                         'grad_E':grad_E,
-                        'n_samples':n_samples}
-    
-    if burn_in:
+                        'n_samples':n_samples,
+                        'train_stddev':train_stddev}
+
+    if burn_in is not None:
         sampling_options['burn_in'] = burn_in
-    if thinning_factor:
+    if thinning_factor is not None:
         sampling_options['thinning_factor'] = thinning_factor
-    if proposal_stddev:
+    if proposal_stddev is not None:
         sampling_options['proposal_stddev'] = proposal_stddev
-    if n_E_approx_path:
+    if n_E_approx_path is not None:
         sampling_options['n_E_approx_path'] = n_E_approx_path
-    if langevin_lambda:
-        sampling_options['langevin_lambda'] = langevin_lambda
+    if langevin_stddev is not None:
+        sampling_options['langevin_stddev'] = langevin_stddev
+    if langevin_beta is not None:
+        sampling_options['langevin_beta'] = langevin_beta
+
+    print sampling_options
 
     #### Perform the sampling. ####
-
     res = dispatcher.mcmc_generate_samples(sampling_options)
     #
     # res has keys : samples
@@ -200,7 +197,9 @@ def main(argv):
     sampling_extra_details['thinning_factor'] = thinning_factor
     sampling_extra_details['burn_in'] = burn_in
     sampling_extra_details['proposal_stddev'] = proposal_stddev
-    sampling_extra_details['langevin_lambda'] = langevin_lambda
+    sampling_extra_details['langevin_stddev'] = langevin_stddev
+    sampling_extra_details['langevin_beta'] = langevin_beta
+    sampling_extra_details['train_stddev'] = train_stddev
     sampling_extra_details['n_E_approx_path'] = n_E_approx_path
 
     sampling_extra_pickle_file = os.path.join(output_dir, "sampling_extra_details.pkl")
