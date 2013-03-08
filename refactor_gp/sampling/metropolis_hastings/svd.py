@@ -96,6 +96,9 @@ def sample_chain(x0, N,
         assert J.shape[1] == d
         assert proposed_J.shape[1] == d
 
+        # print "f_prime^T f_prime is"
+        # print f_prime(current_x).T.dot( f_prime(current_x) )
+
         # We will essentially bypass the SVD decomposition by
         # using J^T J instead of V^T D^2 V from the SVD.
         # The two quantities are equivalent.

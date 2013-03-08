@@ -68,7 +68,7 @@ def sample_chain(x0, N,
                     'langevin_beta':langevin_beta,
                     'temperature':temperature}
 
-    def langevin_proposal(current_x, preimage_current_x):
+    def langevin_proposal(current_x, preimage_current_x, want_proposal_log_ratio=True):
 
         # We are using the term "preimage" here because it corresponds
         # to the preimage when langevin_beta=1.0.
@@ -84,25 +84,28 @@ def sample_chain(x0, N,
         preimage_proposed_x = current_x + np.random.normal(size=(d,), scale=langevin_stddev)
         proposed_x = (1-langevin_beta) * preimage_proposed_x + langevin_beta * r(preimage_proposed_x)
 
-        # Now we need to compute
-        # log q( current_x | proposed_x ) - log q( proposed_x | current_x )
+        if want_proposal_log_ratio:
+            # Now we need to compute
+            # log q( current_x | proposed_x ) - log q( proposed_x | current_x )
 
-        A = np.zeros((2,))
-        A[0] = - 0.5/langevin_stddev**2 * ((preimage_current_x - proposed_x)**2).sum()
-        A[1] = -1 * np.linalg.det( (1-langevin_beta) * np.eye(d) +  langevin_beta * r_prime(preimage_current_x))
+            A = np.zeros((2,))
+            A[0] = - 0.5/langevin_stddev**2 * ((preimage_current_x - proposed_x)**2).sum()
+            A[1] = -1 * np.linalg.det( (1-langevin_beta) * np.eye(d) +  langevin_beta * r_prime(preimage_current_x))
 
-        B = np.zeros((2,))
-        B[0] = - 0.5/langevin_stddev**2 * ((preimage_proposed_x - current_x)**2).sum()
-        B[1] = -1 * np.linalg.det( (1-langevin_beta) * np.eye(d) +  langevin_beta * r_prime(preimage_proposed_x))
+            B = np.zeros((2,))
+            B[0] = - 0.5/langevin_stddev**2 * ((preimage_proposed_x - current_x)**2).sum()
+            B[1] = -1 * np.linalg.det( (1-langevin_beta) * np.eye(d) +  langevin_beta * r_prime(preimage_proposed_x))
 
-        asymmetric_correction_log_factor = A[0] + A[1] - B[0] - B[1]
+            asymmetric_correction_log_factor = A[0] + A[1] - B[0] - B[1]
+        else:
+            asymmetric_correction_log_factor = 0.0
 
         return (proposed_x, preimage_proposed_x, asymmetric_correction_log_factor)
 
 
     def iterate_N_times(current_x, preimage_current_x, energy_difference, N):
         for _ in np.arange(N):
-            (proposed_x, preimage_proposed_x, asymmetric_correction_log_factor) = langevin_proposal(current_x, preimage_current_x)
+            (proposed_x, preimage_proposed_x, asymmetric_correction_log_factor) = langevin_proposal(current_x, preimage_current_x, not(accept_all_proposals))
 
             # This is a - in front of the energy difference because
             # log( p(proposed_x) / p(current_x) ) \approx -E(proposed_x) - -E(current_x) = - energy_difference(proposed_x, current_x)

@@ -165,7 +165,7 @@ def main(argv):
                      'early_termination_occurred':early_termination_occurred}
 
     cPickle.dump(extra_details, open(extra_pickle_file, "w"))
-    json.dump(extra_details, open(extra_json_file, "w"))
+    json.dump(extra_details, open(extra_json_file, "w"), sort_keys=True, indent=4, separators=(',', ': '))
     print "Wrote %s" % (extra_pickle_file,)
     print "Wrote %s" % (extra_json_file,)
 

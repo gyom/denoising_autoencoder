@@ -115,27 +115,47 @@ def sample_from_mixture(component_means, component_covariances, n_samples):
     return (samples, component_indices)
 
 
-# TODO : IMPLEMENT THIS !!
-def pdf(sample, component_means, component_covariances):
+import refactor_gp
+import refactor_gp.gyom_utils
+from refactor_gp.gyom_utils import mvnpdf
+from refactor_gp.gyom_utils import grad_mvnpdf
 
+def pdf(x, component_means, component_covariances):
+
+    d = x.shape[0]
+    assert len(x.shape) == 1
     assert component_means != None
     assert component_covariances != None
 
-    (n_components, d) = component_means.shape
-    (n_components1, d1, d2) = component_covariances.shape
+    (n_components, d1) = component_means.shape
+    (n_components1, d2, d3) = component_covariances.shape
     assert n_components == n_components1
-    assert d == d1
-    assert d == d2
+    assert (d,d,d) == (d1,d2,d3)
 
-    samples = np.zeros((n_samples, d))
-    component_indices = np.zeros((n_samples,))
-    for k in np.arange(n_samples):
-        c = np.random.randint(n_components)
-        component_indices[k] = c
-        samples[k,:] = np.random.multivariate_normal(mean=component_means[c,:], cov=component_covariances[c,:,:])
-        
-    return (samples, component_indices)
+    return np.array([mvnpdf(x,component_means[k,:],component_covariances[k,:,:]) for k in np.arange(n_components)]).mean()
 
+
+def grad_pdf(x, component_means, component_covariances):
+
+    d = x.shape[0]
+    assert len(x.shape) == 1
+    assert component_means != None
+    assert component_covariances != None
+
+    (n_components, d1) = component_means.shape
+    (n_components1, d2, d3) = component_covariances.shape
+    assert n_components == n_components1
+    assert (d,d,d) == (d1,d2,d3)
+
+    # Stack all the contributions from all the components in n_components rows.
+    # Each row has d coefficients.
+    # Collapse the columns by averaging.
+    A = np.vstack([grad_mvnpdf(x,component_means[k,:],component_covariances[k,:,:]) for k in np.arange(n_components)])
+    assert (n_components, d)== A.shape
+    return A.mean(axis=0)
+
+def grad_E(x, component_means, component_covariances):
+    return - grad_pdf(x, component_means, component_covariances) / pdf(x, component_means, component_covariances)
 
 
 
