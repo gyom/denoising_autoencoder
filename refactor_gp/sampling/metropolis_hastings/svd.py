@@ -81,14 +81,28 @@ def sample_chain(x0, N,
 
     def proposal(current_x, preimage_current_x):
 
+        want_renormalization_of_J = True
+
         d = current_x.shape[0]
 
-        J = f_prime(current_x) * langevin_stddev
+        if want_renormalization_of_J:
+            M = f_prime(current_x)
+            J = M / np.linalg.norm(M,2) * langevin_stddev
+            del M
+        else:
+            J = f_prime(current_x) * langevin_stddev
+
         det_JTJ = np.linalg.det(J.T.dot(J))
         z = np.random.normal(size=J.shape[0])
         preimage_proposed_x = current_x + J.T.dot(z)
         proposed_x = (1-langevin_beta) * preimage_proposed_x + langevin_beta * r(preimage_proposed_x)
-        proposed_J = f_prime(proposed_x)
+        if want_renormalization_of_J:
+            M = f_prime(proposed_x)
+            proposed_J = M / np.linalg.norm(M,2) * langevin_stddev
+            del M
+        else:
+            proposed_J = f_prime(proposed_x) * langevin_stddev
+
         det_proposed_JTJ = np.linalg.det(proposed_J.T.dot(proposed_J))
 
         # Bear in mind that the covariance of the mvn stemming from current_x
@@ -96,8 +110,10 @@ def sample_chain(x0, N,
         assert J.shape[1] == d
         assert proposed_J.shape[1] == d
 
-        # print "f_prime^T f_prime is"
-        # print f_prime(current_x).T.dot( f_prime(current_x) )
+        #print "======================"
+        #print J.T.dot( J )
+        #print proposed_J.T.dot( proposed_J )
+        #print "======================"
 
         # We will essentially bypass the SVD decomposition by
         # using J^T J instead of V^T D^2 V from the SVD.

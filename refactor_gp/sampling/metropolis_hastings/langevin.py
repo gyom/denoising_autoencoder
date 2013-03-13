@@ -68,7 +68,7 @@ def sample_chain(x0, N,
                     'langevin_beta':langevin_beta,
                     'temperature':temperature}
 
-    def langevin_proposal(current_x, preimage_current_x, want_proposal_log_ratio=True):
+    def langevin_proposal(current_x, preimage_current_x, want_one_minus_beta=False, want_proposal_log_ratio=True):
 
         # We are using the term "preimage" here because it corresponds
         # to the preimage when langevin_beta=1.0.
@@ -81,22 +81,42 @@ def sample_chain(x0, N,
         # than about being the preimage. Latex the stuff above to read it properly.
 
         d = current_x.shape[0]
-        preimage_proposed_x = current_x + np.random.normal(size=(d,), scale=langevin_stddev)
-        proposed_x = (1-langevin_beta) * preimage_proposed_x + langevin_beta * r(preimage_proposed_x)
+
+        # TODO : implement something that uses this, perhaps for the pure langevin mode
+        if want_one_minus_beta:
+            preimage_proposed_x = current_x + np.random.normal(size=(d,), scale=langevin_stddev)
+            proposed_x = (1-langevin_beta) * preimage_proposed_x + langevin_beta * r(preimage_proposed_x)
+        else:
+            preimage_proposed_x = current_x + np.random.normal(size=(d,), scale=langevin_stddev)
+            proposed_x = current_x + langevin_beta * preimage_proposed_x - langevin_beta * r(preimage_proposed_x)
+
+        #print "=============="
+        #print current_x
+        #print preimage_proposed_x
+        #print proposed_x
+        #print "=============="
+        #print ""
+        #if np.any(np.isnan(proposed_x)):
+        #    quit()
 
         if want_proposal_log_ratio:
             # Now we need to compute
             # log q( current_x | proposed_x ) - log q( proposed_x | current_x )
 
             A = np.zeros((2,))
-            A[0] = - 0.5/langevin_stddev**2 * ((preimage_current_x - proposed_x)**2).sum()
-            A[1] = -1 * np.linalg.det( (1-langevin_beta) * np.eye(d) +  langevin_beta * r_prime(preimage_current_x))
-
             B = np.zeros((2,))
-            B[0] = - 0.5/langevin_stddev**2 * ((preimage_proposed_x - current_x)**2).sum()
-            B[1] = -1 * np.linalg.det( (1-langevin_beta) * np.eye(d) +  langevin_beta * r_prime(preimage_proposed_x))
+            if want_one_minus_beta:
 
-            asymmetric_correction_log_factor = A[0] + A[1] - B[0] - B[1]
+                A[0] = - 0.5/langevin_stddev**2 * ((preimage_current_x - proposed_x)**2).sum()
+                A[1] = -1 * np.linalg.det( (1-langevin_beta) * np.eye(d) +  langevin_beta * r_prime(preimage_current_x))
+
+                B[0] = - 0.5/langevin_stddev**2 * ((preimage_proposed_x - current_x)**2).sum()
+                B[1] = -1 * np.linalg.det( (1-langevin_beta) * np.eye(d) +  langevin_beta * r_prime(preimage_proposed_x))
+            else:
+                A[0] = - 0.5/langevin_stddev**2 * ((preimage_current_x - proposed_x)**2).sum()
+                B[0] = - 0.5/langevin_stddev**2 * ((preimage_proposed_x - current_x)**2).sum()
+
+            asymmetric_correction_log_factor = A[0] + A[1] - B[0] - B[1]                
         else:
             asymmetric_correction_log_factor = 0.0
 
@@ -105,12 +125,16 @@ def sample_chain(x0, N,
 
     def iterate_N_times(current_x, preimage_current_x, energy_difference, N):
         for _ in np.arange(N):
-            (proposed_x, preimage_proposed_x, asymmetric_correction_log_factor) = langevin_proposal(current_x, preimage_current_x, not(accept_all_proposals))
+            (proposed_x, preimage_proposed_x, asymmetric_correction_log_factor) = langevin_proposal(current_x, preimage_current_x, want_proposal_log_ratio = not(accept_all_proposals))
 
-            # This is a - in front of the energy difference because
-            # log( p(proposed_x) / p(current_x) ) \approx -E(proposed_x) - -E(current_x) = - energy_difference(proposed_x, current_x)
-            loga = - energy_difference(proposed_x, current_x) + asymmetric_correction_log_factor
-            if accept_all_proposals or loga >= 0 or loga >= np.log(np.random.uniform(0,1)):
+            if accept_all_proposals:
+                loga = 0.0
+            else:
+                # This is a - in front of the energy difference because
+                # log( p(proposed_x) / p(current_x) ) \approx -E(proposed_x) - -E(current_x) = - energy_difference(proposed_x, current_x)
+                loga = - energy_difference(proposed_x, current_x) + asymmetric_correction_log_factor
+
+            if accept_all_proposals or loga >= 0.0 or loga >= np.log(np.random.uniform(0,1)):
                 # accepted !
                 current_x = proposed_x
                 preimage_current_x = preimage_proposed_x

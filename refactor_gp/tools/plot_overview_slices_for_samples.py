@@ -66,9 +66,11 @@ def main(argv):
     ind = np.arange(M)
     np.random.shuffle(ind)
     subsamples = samples[ind[0:N]]
+    print "subsamples.shape is %s" % (str(subsamples.shape),)
 
     for i in range(0,d-1):
         output_image_file = os.path.join(output_dir,"overview_dimensions_%d_and_%d.png" % (i,i+1))
+        print "Will attempt to generate %s" % (output_image_file,)
         plot_the_overview(subsamples, i, i+1, output_image_file)
         print "Wrote %s." % ( output_image_file, )
 
@@ -76,6 +78,8 @@ def main(argv):
 def plot_the_overview(samples, i, j, output_image_file, dpi=150):
 
     pylab.hold(True)
+    #print samples[:,i].shape
+    #print samples[:,j].shape
     pylab.scatter(samples[:,i], samples[:,j])
     pylab.draw()
     pylab.savefig(output_image_file, dpi=dpi)

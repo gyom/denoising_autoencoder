@@ -119,6 +119,7 @@ import refactor_gp
 import refactor_gp.gyom_utils
 from refactor_gp.gyom_utils import mvnpdf
 from refactor_gp.gyom_utils import grad_mvnpdf
+from refactor_gp.gyom_utils import normalized_weighted_sum_with_log_coefficients
 
 def pdf(x, component_means, component_covariances):
 
@@ -135,7 +136,7 @@ def pdf(x, component_means, component_covariances):
     return np.array([mvnpdf(x,component_means[k,:],component_covariances[k,:,:]) for k in np.arange(n_components)]).mean()
 
 
-def grad_pdf(x, component_means, component_covariances):
+def grad_pdf(x, component_means, component_covariances = None):
 
     d = x.shape[0]
     assert len(x.shape) == 1
@@ -158,7 +159,35 @@ def grad_E(x, component_means, component_covariances):
     return - grad_pdf(x, component_means, component_covariances) / pdf(x, component_means, component_covariances)
 
 
+class MixtureMVN():
+    def __init__(self, means, covariances):
+        (K,d) = means.shape
+        (K0,d1,d2) = covariances.shape
+        assert (K==K0) and (d==d1) and (d==d2)
+        self.d = d
+        self.K = K
+        self.means = means
+        self.covariances = covariances
+        self.precisions = np.zeros(covariances.shape)
+        self.precisions_dets = np.zeros((K,))
+        for k in range(0,K):
+            self.precisions[k,:,:] = np.linalg.inv(covariances[k,:,:])
+            self.precisions_dets[k] = np.linalg.det(self.precisions[k,:,:])
 
+    def grad_pdf(self, x):
+        assert self.d == x.shape[0]
+        assert len(x.shape) == 1
+
+        logc = np.zeros((self.K,))
+        E = np.zeros((self.K,self.d))
+        for k in range(self.K):
+            (logck, Ek) = grad_mvnpdf(x, self.means[k,:], precision=self.precisions[k,:,:], precision_det=self.precisions_dets[k], want_log_decomposition=True)
+            logc[k] = logck
+            E[k,:] = Ek
+
+        res = normalized_weighted_sum_with_log_coefficients(logc, E, axis=0)
+        assert res.shape == x.shape
+        return res
 
 # If this is called, we'll just run a sanity check.
 def main():

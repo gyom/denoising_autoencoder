@@ -174,8 +174,33 @@ def main(argv):
         #                  'f_parameters':f_parameters,
         #                  'computational_cost_in_seconds':computational_cost_in_seconds}
 
-        def grad_E(x):
-            return gaussian_mixture_tools.grad_E(x, extra_props['component_means'], extra_props['component_covariances'])
+        if True:
+            mixturemvn = gaussian_mixture_tools.MixtureMVN(extra_props['component_means'], extra_props['component_covariances'])
+            
+            def grad_E(x):
+                res = - mixturemvn.grad_pdf(x)
+                #base_truth_res = gaussian_mixture_tools.grad_E(x, extra_props['component_means'], extra_props['component_covariances'])
+                #assert(np.all(np.abs(res - base_truth_res) < 1e-8))
+
+                if np.any(np.isnan(res)):
+                    print "grad_E got argument"
+                    print x
+                    print "and returned"
+                    print res
+                    print "ERROR. grad_E just returned nan !"
+                    quit()
+                return res
+        else:
+            def grad_E(x):
+                res = gaussian_mixture_tools.grad_E(x, extra_props['component_means'], extra_props['component_covariances'])
+                if np.any(np.isnan(res)):
+                    print "grad_E got argument"
+                    print x
+                    print "and returned"
+                    print res
+                    print "ERROR. grad_E just returned nan !"
+                    quit()
+                return res
 
         def r(x):
             return x + fake_train_stddev**2 * grad_E(x)
@@ -250,6 +275,13 @@ def main(argv):
         if k not in ['r', 'r_prime', 'f', 'f_prime', 'grad_E', 'x0']:
             sampling_extra_details[k] = v
         
+    if pickled_dae_dir is not None:
+        sampling_extra_details['pickled_dae_dir'] = pickled_dae_dir
+    if exact_grad_E_from_mixture_mvn_pickle is not None:
+        sampling_extra_details['exact_grad_E_from_mixture_mvn_pickle'] = exact_grad_E_from_mixture_mvn_pickle
+    if fake_train_stddev is not None:
+        sampling_extra_details['fake_train_stddev'] = fake_train_stddev
+
 
     sampling_extra_pickle_file = os.path.join(output_dir, "sampling_extra_details.pkl")
     sampling_extra_json_file = os.path.join(output_dir, "sampling_extra_details.json")

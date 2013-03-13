@@ -51,10 +51,48 @@ def make_progress_logger(prefix):
 
 import numpy as np
 
-def mvnpdf(x,m,covariance=None,precision=None):
-    return np.exp(log_mvnpdf(x,m,covariance,precision))
+def normalized_weighted_sum_with_log_coefficients(logc, E, axis=0):
+    """
+    E is a list of numpy arrays, or a numpy array itself.
 
-def log_mvnpdf(x,m,covariance=None,precision=None):
+    The point of this method is that we want to be
+    able to sum E along one dimension with coefficients that
+    are very small.
+
+    If E is a list, then we don't have to specify the
+    axis along which we are summing.
+    """
+
+    if type(E) == np.ndarray:
+        assert len(logc.shape) == 1
+        assert (logc.shape[0] == E.shape[axis])
+
+        logc -= np.max(logc)
+
+        A = np.array(E.shape)
+        A[axis] = 1
+        # let's say axis=3, then
+        # A looks like (2,3,4,1,5,6)
+        B = np.ones((len(E.shape),))
+        B[axis] = logc.shape[0]
+        # B looks like (1,1,1,n,1,1)
+        c = np.exp(logc)
+        C = np.tile(c.reshape(B), A)
+        assert C.shape == E.shape
+        res = (C * E).sum(axis=axis) / c.sum()
+        return res
+    elif type(E) == list:
+        logc -= np.max(logc)
+        c = np.exp(logc)
+        return 1.0 / c.sum() * reduce(lambda x,y: x+y, E)
+    else:
+        raise("Error. Unrecognized format.")
+
+
+def mvnpdf(x,m,covariance=None,precision=None,precision_det=None):
+    return np.exp(log_mvnpdf(x,m,covariance,precision,precision_det=precision_det))
+
+def log_mvnpdf(x,m,covariance=None,precision=None,precision_det=None):
     """
     Expecting either the covariance matrix or the precision matrix (its inverse).
 
@@ -69,19 +107,23 @@ def log_mvnpdf(x,m,covariance=None,precision=None):
 
     if (precision is None):
         precision = np.linalg.inv(covariance)
+        assert (d,d) == precision.shape
 
-    #print covariance.shape
-    #print precision.shape
-    assert (d,d) == precision.shape
+    if (precision_det is None):
+        precision_det = np.linalg.det(precision)
 
     y = x - m
-    return -0.5 * d * np.log(2*np.pi) + 0.5 * np.log(np.linalg.det(precision)) - 0.5 * y.dot(precision).dot(y)
+    return -0.5 * d * np.log(2*np.pi) + 0.5 * np.log(precision_det) - 0.5 * y.dot(precision).dot(y)
 
 
-def grad_mvnpdf(x,m,covariance=None,precision=None):
+def grad_mvnpdf(x,m,covariance=None,precision=None,precision_det=None, want_log_decomposition=False):
 
     if (precision is None):
         precision = np.linalg.inv(covariance)
 
-    return mvnpdf(x,m,precision=precision) * -1.0 * precision.dot(x-m)
-
+    if want_log_decomposition:
+        # Returns two values instead which are intended to be used
+        # with normalized_weighted_sum_with_log_coefficients(...).
+        return (log_mvnpdf(x,m,precision=precision,precision_det=precision_det), -1.0 * precision.dot(x-m))
+    else:
+        return mvnpdf(x,m,precision=precision,precision_det=precision_det) * -1.0 * precision.dot(x-m)

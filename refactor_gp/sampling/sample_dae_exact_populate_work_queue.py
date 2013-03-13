@@ -10,19 +10,21 @@ if not r_server.ping():
     quit()
 
 
+#exact_grad_E_from_mixture_mvn_pickle = "/data/lisatmp2/alaingui/dae/datasets/gaussian_mixture/d10_eig0.1_comp25_001/train_samples_extra.pkl"
 exact_grad_E_from_mixture_mvn_pickle = "/data/lisatmp2/alaingui/dae/datasets/gaussian_mixture/d2_eig0.1_comp25_001/train_samples_extra.pkl"
 script_path = "/u/alaingui/umontreal/denoising_autoencoder/refactor_gp/sampling/sample_dae.py"
 
-experiment_name = "experiment_14"
+experiment_name = "experiment_20_2"
 
 n_samples=500
-thinning_factor=1000
-L_n_E_approx_path = [5]
+thinning_factor=100
+L_n_E_approx_path = [0]
 
-L_mcmc_method = ["langevin_grad_E", "MH_langevin_grad_E"]
+#L_mcmc_method = ["MH_langevin_grad_E"]
+L_mcmc_method = ["langevin_grad_E"]
 
-L_langevin_stddev = [0.1, 0.05, 0.01]
-L_fake_train_stddev = [0.1, 0.05, 0.01]
+L_langevin_stddev = [0.01, 0.001]
+L_fake_train_stddev = [0.1, 0.01]
 L_langevin_beta = [1.0, 0.5, 0.1]
 
 want_overview_plots = "True"

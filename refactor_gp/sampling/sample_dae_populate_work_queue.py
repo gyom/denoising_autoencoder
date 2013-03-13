@@ -18,18 +18,20 @@ script_path = "/u/alaingui/umontreal/denoising_autoencoder/refactor_gp/sampling/
 # selected manually
 #pickled_dae_dir = "/data/lisatmp2/alaingui/dae/dae_trained_models/gaussian_mixture_d10/experiment_07/000021"
 
-#L_pickled_dae_dir = ["/data/lisatmp2/alaingui/dae/dae_trained_models/gaussian_mixture_d10/experiment_13/%0.6d" % i for i in [18,45,6,23,29,10,3]]
-L_pickled_dae_dir = ["/data/lisatmp2/alaingui/dae/dae_trained_models/gaussian_mixture_d2/experiment_11/%0.6d" % i for i in [0, 17, 90, 5, 18]]
+L_pickled_dae_dir = ["/data/lisatmp2/alaingui/dae/dae_trained_models/gaussian_mixture_d10/experiment_13/%0.6d" % i for i in [18,45,6,23,29,10,3]]
+#L_pickled_dae_dir = ["/data/lisatmp2/alaingui/dae/dae_trained_models/gaussian_mixture_d10/experiment_13/%0.6d" % i for i in [18,23,29]]
+#L_pickled_dae_dir = ["/data/lisatmp2/alaingui/dae/dae_trained_models/gaussian_mixture_d2/experiment_11/%0.6d" % i for i in [0, 17, 90, 5, 18]]
 
 n_samples=500
-thinning_factor=1000
-L_n_E_approx_path = [5]
+thinning_factor=10
+L_n_E_approx_path = [0]
 #L_mcmc_method = ["MH_grad_E", "langevin_grad_E", "MH_langevin_grad_E", "MH_svd_grad_E"]
 #L_mcmc_method = ["MH_grad_E", "MH_langevin_grad_E"]
-L_mcmc_method = ["MH_langevin_grad_E", "MH_svd_grad_E"]
+#L_mcmc_method = ["MH_langevin_grad_E", "MH_svd_grad_E"]
+L_mcmc_method = ["langevin_grad_E"]
 
 L_langevin_stddev = [0.1]
-L_langevin_beta = [2.0, 1.0, 0.5, 0.1]
+L_langevin_beta = [1.0, 0.3, 0.1]
 L_proposal_stddev = [0.1]
 
 want_overview_plots = "True"
@@ -38,7 +40,7 @@ want_overview_plots = "True"
 output_dir_counter = 0
 #experiment_name = "experiment_13_02_MH_langevin_grad_E"
 #experiment_name = "experiment_13_01_MH_grad_E"
-experiment_name = "experiment_11_first_time_with_beta"
+experiment_name = "experiment_18_langevin"
 
 for mcmc_method in L_mcmc_method:
     for pickled_dae_dir in L_pickled_dae_dir:
