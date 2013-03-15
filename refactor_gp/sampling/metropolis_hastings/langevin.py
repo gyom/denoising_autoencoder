@@ -11,7 +11,7 @@ def sample_chain(x0, N,
                  energy_difference, noise_levels,
                  r, r_prime,
                  thinning_factor = 1, burn_in = 0,
-                 accept_all_proposals = False):
+                 accept_all_proposals = False, proposal_noise_scheme = 'merge_x', omit_asymmetric_proposal_factor = False):
     """
     Will sample N values for the chain starting with x0.
 
@@ -20,55 +20,18 @@ def sample_chain(x0, N,
 
     """
 
+    print proposal_noise_scheme
+
     assert len(x0.shape) == 1, "Wrong dimension for x0."
 
     assert thinning_factor >= 1, "You misunderstood the thinning_factor. It should be 1 for no thinning, and 32 if we want one out of every 32 samples."
 
-    assert noise_levels.has_key("train_stddev")
-    train_stddev = noise_levels["train_stddev"]
+    train_stddev    = noise_levels["train_stddev"]
+    langevin_stddev = noise_levels["langevin_stddev"]
+    langevin_beta   = noise_levels["langevin_beta"]
+    temperature     = noise_levels["temperature"]
 
-    if noise_levels.has_key("langevin_stddev") and noise_levels.has_key("langevin_beta"):
-        langevin_stddev = noise_levels["langevin_stddev"]
-        langevin_beta = noise_levels["langevin_beta"]
-
-    elif noise_levels.has_key("langevin_stddev") and not noise_levels.has_key("langevin_beta"):
-        langevin_stddev = noise_levels["langevin_stddev"]
-        temperature = 1.0
-        langevin_beta = langevin_stddev**2 / (2*temperature*train_stddev**2)
-
-    elif noise_levels.has_key("langevin_beta") and not noise_levels.has_key("langevin_stddev"):
-        langevin_beta = noise_levels["langevin_beta"]
-        temperature = 1.0
-        langevin_stddev = np.sqrt(2*temperature*langevin_beta)*train_stddev
-
-    else:
-        # we've got nothing, so let's pick beta=1
-        langevin_beta = 1.0
-        temperature = 1.0
-        langevin_stddev = np.sqrt(2*temperature*langevin_beta)*train_stddev
-
-    assert train_stddev > 0
-    assert langevin_stddev > 0
-    assert not (langevin_beta == 0.0)
-    if langevin_beta < 0.0 or 1.0 < langevin_beta:
-        print "This is not **NECESSARILY** an error, but it is a bit strange to be using a beta outside of the range [0,1]."
-
-    temperature = langevin_stddev**2 / ( 2 * langevin_beta * train_stddev**2 )
-    print "==========================="
-    print "With your current setup, you have that the sampling procedure scales as follows."
-    print ""
-    print "train_stddev : %f" % train_stddev
-    print "langevin_stddev : %f" % langevin_stddev
-    print 
-    print "langevin_beta : %f" % langevin_beta
-    print "temperature : %f" % temperature
-    print "==========================="
-    noise_levels = {'train_stddev':train_stddev,
-                    'langevin_stddev':langevin_stddev,
-                    'langevin_beta':langevin_beta,
-                    'temperature':temperature}
-
-    def langevin_proposal(current_x, preimage_current_x, want_one_minus_beta=False, want_proposal_log_ratio=True):
+    def langevin_proposal(current_x, preimage_current_x):
 
         # We are using the term "preimage" here because it corresponds
         # to the preimage when langevin_beta=1.0.
@@ -80,58 +43,65 @@ def sample_chain(x0, N,
         #
         # than about being the preimage. Latex the stuff above to read it properly.
 
+        # This function accesses the variables from the "closure" : accept_all_proposals, proposal_noise_scheme
+
         d = current_x.shape[0]
 
-        # TODO : implement something that uses this, perhaps for the pure langevin mode
-        if want_one_minus_beta:
+        if proposal_noise_scheme == 'merge_x':
             preimage_proposed_x = current_x + np.random.normal(size=(d,), scale=langevin_stddev)
             proposed_x = (1-langevin_beta) * preimage_proposed_x + langevin_beta * r(preimage_proposed_x)
-        else:
+        elif proposal_noise_scheme == 'noise_E':
             preimage_proposed_x = current_x + np.random.normal(size=(d,), scale=langevin_stddev)
-            proposed_x = current_x + langevin_beta * preimage_proposed_x - langevin_beta * r(preimage_proposed_x)
+            proposed_x = current_x - langevin_beta * preimage_proposed_x + langevin_beta * r(preimage_proposed_x)
+        elif proposal_noise_scheme == 'noise_r':
+            preimage_proposed_x = current_x + np.random.normal(size=(d,), scale=langevin_stddev)
+            proposed_x = (1-langevin_beta)*current_x  + langevin_beta * r(preimage_proposed_x)
+        else:
+            raise("Unrecognized proposal_noise_scheme : %s" % proposal_noise_scheme)
 
-        #print "=============="
-        #print current_x
-        #print preimage_proposed_x
-        #print proposed_x
-        #print "=============="
-        #print ""
-        #if np.any(np.isnan(proposed_x)):
-        #    quit()
-
-        if want_proposal_log_ratio:
+        if accept_all_proposals or omit_asymmetric_proposal_factor:
+            asymmetric_correction_log_factor = 0.0
+        else:
             # Now we need to compute
             # log q( current_x | proposed_x ) - log q( proposed_x | current_x )
 
             A = np.zeros((2,))
             B = np.zeros((2,))
-            if want_one_minus_beta:
 
-                A[0] = - 0.5/langevin_stddev**2 * ((preimage_current_x - proposed_x)**2).sum()
+            A[0] = - 0.5/langevin_stddev**2 * ((preimage_current_x - proposed_x)**2).sum()
+            B[0] = - 0.5/langevin_stddev**2 * ((preimage_proposed_x - current_x)**2).sum()
+            if proposal_noise_scheme == 'merge_x':
                 A[1] = -1 * np.linalg.det( (1-langevin_beta) * np.eye(d) +  langevin_beta * r_prime(preimage_current_x))
-
-                B[0] = - 0.5/langevin_stddev**2 * ((preimage_proposed_x - current_x)**2).sum()
                 B[1] = -1 * np.linalg.det( (1-langevin_beta) * np.eye(d) +  langevin_beta * r_prime(preimage_proposed_x))
+            elif proposal_noise_scheme == 'noise_E':
+                # clueless
+                A[1] = -1 * np.linalg.det( (-langevin_beta) * np.eye(d) + langevin_beta * r_prime(preimage_current_x))
+                B[1] = -1 * np.linalg.det( (-langevin_beta) * np.eye(d) + langevin_beta * r_prime(preimage_proposed_x))
+                #pass
+            elif proposal_noise_scheme == 'noise_r':
+                # clueless
+                A[1] = -1 * np.linalg.det( langevin_beta * r_prime(preimage_current_x))
+                B[1] = -1 * np.linalg.det( langevin_beta * r_prime(preimage_proposed_x))
+                #pass
             else:
-                A[0] = - 0.5/langevin_stddev**2 * ((preimage_current_x - proposed_x)**2).sum()
-                B[0] = - 0.5/langevin_stddev**2 * ((preimage_proposed_x - current_x)**2).sum()
+                raise("Unrecognized proposal_noise_scheme : %s" % proposal_noise_scheme)
 
             asymmetric_correction_log_factor = A[0] + A[1] - B[0] - B[1]                
-        else:
-            asymmetric_correction_log_factor = 0.0
+
 
         return (proposed_x, preimage_proposed_x, asymmetric_correction_log_factor)
 
 
     def iterate_N_times(current_x, preimage_current_x, energy_difference, N):
         for _ in np.arange(N):
-            (proposed_x, preimage_proposed_x, asymmetric_correction_log_factor) = langevin_proposal(current_x, preimage_current_x, want_proposal_log_ratio = not(accept_all_proposals))
+            (proposed_x, preimage_proposed_x, asymmetric_correction_log_factor) = langevin_proposal(current_x, preimage_current_x)
 
             if accept_all_proposals:
                 loga = 0.0
             else:
                 # This is a - in front of the energy difference because
                 # log( p(proposed_x) / p(current_x) ) \approx -E(proposed_x) - -E(current_x) = - energy_difference(proposed_x, current_x)
+                # loga = - energy_difference(proposed_x, current_x) / temperature + asymmetric_correction_log_factor
                 loga = - energy_difference(proposed_x, current_x) + asymmetric_correction_log_factor
 
             if accept_all_proposals or loga >= 0.0 or loga >= np.log(np.random.uniform(0,1)):

@@ -11,7 +11,9 @@ def sample_chain(x0, N,
                  energy_difference, noise_levels,
                  r, r_prime, f_prime,
                  thinning_factor = 1, burn_in = 0,
-                 accept_all_proposals = False):
+                 accept_all_proposals = False,
+                 proposal_noise_scheme = 'merge_x',
+                 omit_asymmetric_proposal_factor = False):
     """
         f        g
     X -----> H -----> X
@@ -35,49 +37,13 @@ def sample_chain(x0, N,
     assert len(x0.shape) == 1, "Wrong dimension for x0."
     assert f_prime
 
-    assert noise_levels.has_key("train_stddev")
-    train_stddev = noise_levels["train_stddev"]
+    train_stddev    = noise_levels["train_stddev"]
+    langevin_stddev = noise_levels["langevin_stddev"]
+    langevin_beta   = noise_levels["langevin_beta"]
+    temperature     = noise_levels["temperature"]
 
-    if noise_levels.has_key("langevin_stddev") and noise_levels.has_key("langevin_beta"):
-        langevin_stddev = noise_levels["langevin_stddev"]
-        langevin_beta = noise_levels["langevin_beta"]
-
-    elif noise_levels.has_key("langevin_stddev") and not noise_levels.has_key("langevin_beta"):
-        langevin_stddev = noise_levels["langevin_stddev"]
-        temperature = 1.0
-        langevin_beta = langevin_stddev**2 / (2*temperature*train_stddev**2)
-
-    elif noise_levels.has_key("langevin_beta") and not noise_levels.has_key("langevin_stddev"):
-        langevin_beta = noise_levels["langevin_beta"]
-        temperature = 1.0
-        langevin_stddev = np.sqrt(2*temperature*langevin_beta)*train_stddev
-
-    else:
-        # we've got nothing, so let's pick beta=1
-        langevin_beta = 1.0
-        temperature = 1.0
-        langevin_stddev = np.sqrt(2*temperature*langevin_beta)*train_stddev
-
-    assert train_stddev > 0
-    assert langevin_stddev > 0
-    assert not (langevin_beta == 0.0)
-    if langevin_beta < 0.0 or 1.0 < langevin_beta:
-        print "This is not **NECESSARILY** an error, but it is a bit strange to be using a beta outside of the range [0,1]."
-
-    temperature = langevin_stddev**2 / ( 2 * langevin_beta * train_stddev**2 )
-    print "==========================="
-    print "With your current setup, you have that the sampling procedure scales as follows."
-    print ""
-    print "train_stddev : %f" % train_stddev
-    print "langevin_stddev : %f" % langevin_stddev
-    print 
-    print "langevin_beta : %f" % langevin_beta
-    print "temperature : %f" % temperature
-    print "==========================="
-    noise_levels = {'train_stddev':train_stddev,
-                    'langevin_stddev':langevin_stddev,
-                    'langevin_beta':langevin_beta,
-                    'temperature':temperature}
+    # TODO : use an equivalent to the 'proposal_noise_scheme'
+    assert proposal_noise_scheme == "merge_x"
 
     def proposal(current_x, preimage_current_x):
 
@@ -96,46 +62,52 @@ def sample_chain(x0, N,
         z = np.random.normal(size=J.shape[0])
         preimage_proposed_x = current_x + J.T.dot(z)
         proposed_x = (1-langevin_beta) * preimage_proposed_x + langevin_beta * r(preimage_proposed_x)
-        if want_renormalization_of_J:
-            M = f_prime(proposed_x)
-            proposed_J = M / np.linalg.norm(M,2) * langevin_stddev
-            del M
+
+        if omit_asymmetric_proposal_factor:
+            asymmetric_correction_log_factor = 0.0
         else:
-            proposed_J = f_prime(proposed_x) * langevin_stddev
 
-        det_proposed_JTJ = np.linalg.det(proposed_J.T.dot(proposed_J))
+            if want_renormalization_of_J:
+                M = f_prime(proposed_x)
+                proposed_J = M / np.linalg.norm(M,2) * langevin_stddev
+                del M
+            else:
+                proposed_J = f_prime(proposed_x) * langevin_stddev
 
-        # Bear in mind that the covariance of the mvn stemming from current_x
-        # will be J^T J and not just J.
-        assert J.shape[1] == d
-        assert proposed_J.shape[1] == d
+            det_proposed_JTJ = np.linalg.det(proposed_J.T.dot(proposed_J))
 
-        #print "======================"
-        #print J.T.dot( J )
-        #print proposed_J.T.dot( proposed_J )
-        #print "======================"
+            # Bear in mind that the covariance of the mvn stemming from current_x
+            # will be J^T J and not just J.
+            assert J.shape[1] == d
+            assert proposed_J.shape[1] == d
 
-        # We will essentially bypass the SVD decomposition by
-        # using J^T J instead of V^T D^2 V from the SVD.
-        # The two quantities are equivalent.
-        # It would still be nice, in a way, to have access to the eigenvalues
-        # in order to have more control (truncating ?) and be able to log them
-        # as some kind of sanity check (to check Yoshua's fast decay intuition).
+            #print "======================"
+            #print J.T.dot( J )
+            #print proposed_J.T.dot( proposed_J )
+            #print "======================"
 
-        # Now we need to compute
-        # log q( current_x | proposed_x ) - log q( proposed_x | current_x )
+            # We will essentially bypass the SVD decomposition by
+            # using J^T J instead of V^T D^2 V from the SVD.
+            # The two quantities are equivalent.
+            # It would still be nice, in a way, to have access to the eigenvalues
+            # in order to have more control (truncating ?) and be able to log them
+            # as some kind of sanity check (to check Yoshua's fast decay intuition).
 
-        A = np.zeros((2,))
-        v = (preimage_current_x - proposed_x)
-        A[0] = - 0.5 * d * np.log(2 * np.pi) - 0.5 * np.log(det_JTJ) - 0.5 * v.dot(np.linalg.inv(J.T.dot(J))).dot(v)
-        A[1] = -1 * np.linalg.det( (1-langevin_beta) * np.eye(d) +  langevin_beta * r_prime(preimage_current_x))
+            # Now we need to compute
+            # log q( current_x | proposed_x ) - log q( proposed_x | current_x )
 
-        B = np.zeros((2,))
-        v = (preimage_proposed_x - current_x)
-        B[0] = - 0.5 * d * np.log(2 * np.pi) - 0.5 * np.log(det_proposed_JTJ) - 0.5 * v.dot(np.linalg.inv(proposed_J.T.dot(proposed_J))).dot(v)
-        B[1] = -1 * np.linalg.det( (1-langevin_beta) * np.eye(d) +  langevin_beta * r_prime(preimage_proposed_x))
+            A = np.zeros((2,))
+            v = (preimage_current_x - proposed_x)
+            A[0] = - 0.5 * d * np.log(2 * np.pi) - 0.5 * np.log(det_JTJ) - 0.5 * v.dot(np.linalg.inv(J.T.dot(J))).dot(v)
+            A[1] = -1 * np.linalg.det( (1-langevin_beta) * np.eye(d) +  langevin_beta * r_prime(preimage_current_x))
 
-        asymmetric_correction_log_factor = A[0] + A[1] - B[0] - B[1]
+            B = np.zeros((2,))
+            v = (preimage_proposed_x - current_x)
+            B[0] = - 0.5 * d * np.log(2 * np.pi) - 0.5 * np.log(det_proposed_JTJ) - 0.5 * v.dot(np.linalg.inv(proposed_J.T.dot(proposed_J))).dot(v)
+            B[1] = -1 * np.linalg.det( (1-langevin_beta) * np.eye(d) +  langevin_beta * r_prime(preimage_proposed_x))
+
+            asymmetric_correction_log_factor = A[0] + A[1] - B[0] - B[1]
+        # end if omit_asymmetric_proposal_factor
 
         return (proposed_x, preimage_proposed_x, asymmetric_correction_log_factor)
 

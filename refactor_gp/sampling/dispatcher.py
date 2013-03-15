@@ -20,8 +20,12 @@ def mcmc_generate_samples(sampling_options):
     n_samples       = get_dict_key_or_default(sampling_options, 'n_samples',       None, True)
     thinning_factor = get_dict_key_or_default(sampling_options, 'thinning_factor', 100)
     burn_in         = get_dict_key_or_default(sampling_options, 'burn_in',         n_samples * thinning_factor / 10)
+    proposal_noise_scheme = get_dict_key_or_default(sampling_options, 'proposal_noise_scheme', None)
+    omit_asymmetric_proposal_factor = get_dict_key_or_default(sampling_options, 'omit_asymmetric_proposal_factor', None)
+
     langevin_stddev = get_dict_key_or_default(sampling_options, 'langevin_stddev', None)
     langevin_beta   = get_dict_key_or_default(sampling_options, 'langevin_beta',   None)
+    temperature     = get_dict_key_or_default(sampling_options, 'temperature',     None)
     mcmc_method     = get_dict_key_or_default(sampling_options, 'mcmc_method',     None, True)
     x0              = get_dict_key_or_default(sampling_options, 'x0',              np.random.normal(size=(2,)))
     n_chains        = get_dict_key_or_default(sampling_options, 'n_chains',        None)
@@ -116,7 +120,7 @@ def mcmc_generate_samples(sampling_options):
             else:
                 energy_difference = approximate_energy_difference
 
-            (X, acceptance_ratio) = vanilla.sample_chain(x0[c,:], n_samples, energy_difference, proposal_stddev, thinning_factor = thinning_factor, burn_in = burn_in)
+            (X, acceptance_ratio) = vanilla.sample_chain(x0[c,:], n_samples, energy_difference, proposal_stddev, thinning_factor = thinning_factor, burn_in = burn_in, temperature = temperature)
         elif mcmc_method == 'langevin_grad_E':
             assert r
             assert r_prime
@@ -125,13 +129,16 @@ def mcmc_generate_samples(sampling_options):
                 noise_levels["langevin_stddev"] = langevin_stddev
             if not langevin_beta == None:
                 noise_levels["langevin_beta"] = langevin_beta
+            if not temperature == None:
+                noise_levels["temperature"] = temperature
+            noise_levels = fill_missing_values_in_langevin_noise_levels(noise_levels)
 
             if n_E_approx_path and n_E_approx_path > 1:
                 energy_difference = approximate_energy_difference_by_path_integration
             else:
                 energy_difference = approximate_energy_difference
 
-            (X, acceptance_ratio, noise_levels) = langevin.sample_chain(x0[c,:], n_samples, energy_difference, noise_levels, r, r_prime, thinning_factor = thinning_factor, burn_in = burn_in, accept_all_proposals = True)
+            (X, acceptance_ratio, noise_levels) = langevin.sample_chain(x0[c,:], n_samples, energy_difference, noise_levels, r, r_prime, thinning_factor = thinning_factor, burn_in = burn_in, accept_all_proposals = True, proposal_noise_scheme = proposal_noise_scheme, omit_asymmetric_proposal_factor=omit_asymmetric_proposal_factor)
 
         elif mcmc_method == 'MH_langevin_grad_E':
             assert r
@@ -141,13 +148,16 @@ def mcmc_generate_samples(sampling_options):
                 noise_levels["langevin_stddev"] = langevin_stddev
             if not langevin_beta == None:
                 noise_levels["langevin_beta"] = langevin_beta
+            if not temperature == None:
+                noise_levels["temperature"] = temperature
+            noise_levels = fill_missing_values_in_langevin_noise_levels(noise_levels)
 
             if n_E_approx_path and n_E_approx_path > 1:
                 energy_difference = approximate_energy_difference_by_path_integration
             else:
                 energy_difference = approximate_energy_difference
 
-            (X, acceptance_ratio, noise_levels) = langevin.sample_chain(x0[c,:], n_samples, energy_difference, noise_levels, r, r_prime, thinning_factor = thinning_factor, burn_in = burn_in)
+            (X, acceptance_ratio, noise_levels) = langevin.sample_chain(x0[c,:], n_samples, energy_difference, noise_levels, r, r_prime, thinning_factor = thinning_factor, burn_in = burn_in, proposal_noise_scheme=proposal_noise_scheme, omit_asymmetric_proposal_factor=omit_asymmetric_proposal_factor)
 
         elif mcmc_method == "MH_svd_grad_E":
             assert f_prime
@@ -158,13 +168,16 @@ def mcmc_generate_samples(sampling_options):
                 noise_levels["langevin_stddev"] = langevin_stddev
             if not langevin_beta == None:
                 noise_levels["langevin_beta"] = langevin_beta
+            if not temperature == None:
+                noise_levels["temperature"] = temperature
+            noise_levels = fill_missing_values_in_langevin_noise_levels(noise_levels)
 
             if n_E_approx_path and n_E_approx_path > 1:
                 energy_difference = approximate_energy_difference_by_path_integration
             else:
                 energy_difference = approximate_energy_difference
 
-            (X, acceptance_ratio, noise_levels) = svd.sample_chain(x0[c,:], n_samples, energy_difference, noise_levels, r, r_prime, f_prime, thinning_factor = thinning_factor, burn_in = burn_in)
+            (X, acceptance_ratio, noise_levels) = svd.sample_chain(x0[c,:], n_samples, energy_difference, noise_levels, r, r_prime, f_prime, thinning_factor = thinning_factor, burn_in = burn_in, proposal_noise_scheme=proposal_noise_scheme, omit_asymmetric_proposal_factor=omit_asymmetric_proposal_factor)
         else:
             raise("Unrecognized value for parameter 'mcmc_method' : %s" % (mcmc_method,))
 
@@ -190,4 +203,80 @@ def mcmc_generate_samples(sampling_options):
             'noise_levels':noise_levels}
 
 
-    
+def fill_missing_values_in_langevin_noise_levels(noise_levels, want_print_values=True):
+    """
+    train_stddev
+    langevin_stddev
+    langevin_beta
+    temperature
+    """
+
+    def print_values():
+        if want_print_values:
+            print "==========================="
+            print "With your current setup, you have that the sampling procedure scales as follows."
+            print ""
+            print "train_stddev : %f" % train_stddev
+            print "langevin_stddev : %f" % langevin_stddev
+            print 
+            print "langevin_beta : %f" % langevin_beta
+            print "temperature : %f" % temperature
+            print "==========================="
+
+    fields = ['train_stddev', 'langevin_stddev', 'langevin_beta', 'temperature']
+
+    assert noise_levels.has_key("train_stddev")
+    train_stddev = noise_levels["train_stddev"]
+
+    # make sure it doesn't have anything funny included in it
+    for key in noise_levels.keys():
+        assert key in fields
+
+    langevin_stddev = get_dict_key_or_default(noise_levels, 'langevin_stddev', None)
+    langevin_beta = get_dict_key_or_default(noise_levels, 'langevin_beta', None)
+    temperature = get_dict_key_or_default(noise_levels, 'temperature', None)
+
+    nbr_keys = len(noise_levels.keys())
+    if nbr_keys == 4:
+        # nothing to do except maybe validating them ?
+
+        print_values()
+        return {'train_stddev':train_stddev,
+                'langevin_stddev':langevin_stddev,
+                'langevin_beta':langevin_beta,
+                'temperature':temperature}
+
+    if nbr_keys == 3:
+        # find out which one is missing and solve for that one
+        if langevin_stddev is None:
+            langevin_stddev = np.sqrt(2*temperature*langevin_beta)*train_stddev
+        elif langevin_beta is None:
+            langevin_beta = langevin_stddev**2 / (2*temperature*train_stddev**2)
+        elif temperature is None:
+            temperature = langevin_stddev**2 / ( 2 * langevin_beta * train_stddev**2 )
+        else:
+            assert False
+        
+        print_values()
+        return {'train_stddev':train_stddev,
+                'langevin_stddev':langevin_stddev,
+                'langevin_beta':langevin_beta,
+                'temperature':temperature}
+
+    elif nbr_keys <= 2:
+        # Fill out one value first and call this function
+        # recursively to compute the other missing field.
+        #
+        # We decide to prioritize setting the temperature to 1
+        # instead of the somewhat meaningless quantity beta.
+        if temperature is None:
+            temperature = 1.0
+        elif langevin_beta is None:
+            langevin_beta = 1.0
+        else:
+            assert False
+
+        return fill_missing_values_in_langevin_noise_levels( {'train_stddev':train_stddev,
+                                                              'langevin_stddev':langevin_stddev,
+                                                              'langevin_beta':langevin_beta,
+                                                              'temperature':temperature} )

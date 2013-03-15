@@ -11,7 +11,7 @@ import scipy
 
 def sample_chain(x0, N,
                  energy_difference, proposal_stddev,
-                 thinning_factor = 1, burn_in = 0):
+                 thinning_factor = 1, burn_in = 0, temperature = 1.0):
     """
     Vanilla Monte Carlo Markov Chain that proposes changes
     according to isotropic a Normal distribution N(0, proposal_stddev).
@@ -34,7 +34,7 @@ def sample_chain(x0, N,
     def iterate_N_times(current_x, energy_difference, N):
         for _ in np.arange(N):
             proposed_x = proposal(current_x)
-            loga = - energy_difference(proposed_x, current_x)
+            loga = - energy_difference(proposed_x, current_x) / temperature
             if loga >= 0 or loga >= np.log(np.random.uniform(0,1)):
                 # accepted !
                 current_x = proposed_x

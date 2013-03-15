@@ -30,7 +30,7 @@ def main(argv):
     import json
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hv", ["pickled_dae_dir=", "exact_grad_E_from_mixture_mvn_pickle=", "fake_train_stddev=", "mcmc_method=", "n_samples=", "thinning_factor=", "burn_in=", "proposal_stddev=", "langevin_stddev=", "langevin_beta=", "output_dir=", "n_E_approx_path=", "want_overview_plots="])
+        opts, args = getopt.getopt(sys.argv[1:], "hv", ["pickled_dae_dir=", "exact_grad_E_from_mixture_mvn_pickle=", "fake_train_stddev=", "mcmc_method=", "n_samples=", "thinning_factor=", "burn_in=", "proposal_stddev=", "langevin_stddev=", "langevin_beta=", "temperature=", "output_dir=", "n_E_approx_path=", "proposal_noise_scheme=", "want_overview_plots=", "omit_asymmetric_proposal_factor="])
     except getopt.GetoptError as err:
         # print help information and exit:
         print str(err) # will print something like "option -a not recognized"
@@ -47,8 +47,10 @@ def main(argv):
     proposal_stddev = None
     output_dir = None
     n_E_approx_path = None
+    proposal_noise_scheme = None
     langevin_stddev = None
     langevin_beta = None
+    temperature = None
     want_overview_plots = False
 
     verbose = False
@@ -76,10 +78,16 @@ def main(argv):
             langevin_stddev = float(a)
         elif o in ("--langevin_beta"):
             langevin_beta = float(a)
+        elif o in ("--temperature"):
+            temperature = float(a)
         elif o in ("--proposal_stddev"):
             proposal_stddev = float(a)
         elif o in ("--n_E_approx_path"):
             n_E_approx_path = float(a)
+        elif o in ("--proposal_noise_scheme"):
+            proposal_noise_scheme = a
+        elif o in ("--omit_asymmetric_proposal_factor"):
+            omit_asymmetric_proposal_factor = ((a == "True") or (a == "true") or (a == "1"))
         elif o in ("--want_overview_plots"):
             want_overview_plots = ((a == "True") or (a == "true") or (a == "1"))
         elif o in ("--output_dir"):
@@ -234,10 +242,17 @@ def main(argv):
         sampling_options['proposal_stddev'] = proposal_stddev
     if n_E_approx_path is not None:
         sampling_options['n_E_approx_path'] = n_E_approx_path
+    if proposal_noise_scheme is not None:
+        sampling_options['proposal_noise_scheme'] = proposal_noise_scheme
+    if omit_asymmetric_proposal_factor is not None:
+        sampling_options['omit_asymmetric_proposal_factor'] = omit_asymmetric_proposal_factor
     if langevin_stddev is not None:
         sampling_options['langevin_stddev'] = langevin_stddev
     if langevin_beta is not None:
         sampling_options['langevin_beta'] = langevin_beta
+    if temperature is not None:
+        sampling_options['temperature'] = temperature
+
 
     print sampling_options
 
