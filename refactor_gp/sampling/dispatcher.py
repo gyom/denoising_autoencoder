@@ -115,6 +115,11 @@ def mcmc_generate_samples(sampling_options):
         if mcmc_method == 'MH_grad_E':
             assert proposal_stddev > 0
 
+            noise_levels = {'train_stddev':train_stddev,
+                            'proposal_stddev':proposal_stddev}
+            if not temperature == None:
+                noise_levels["temperature"] = temperature
+
             if n_E_approx_path and n_E_approx_path > 1:
                 energy_difference = approximate_energy_difference_by_path_integration
             else:

@@ -94,26 +94,25 @@ def generate_collection_covariance_matrices(E, ratio_eigvals):
     return covariance_matrices
 
 
-def sample_from_mixture(component_means, component_covariances, n_samples):
-
-    assert component_means != None
-    assert component_covariances != None
-
-    (n_components, d) = component_means.shape
-    (n_components1, d1, d2) = component_covariances.shape
-    assert n_components == n_components1
-    assert d == d1
-    assert d == d2
-
-    samples = np.zeros((n_samples, d))
-    component_indices = np.zeros((n_samples,))
-    for k in np.arange(n_samples):
-        c = np.random.randint(n_components)
-        component_indices[k] = c
-        samples[k,:] = np.random.multivariate_normal(mean=component_means[c,:], cov=component_covariances[c,:,:])
-        
-    return (samples, component_indices)
-
+#def sample_from_mixture(component_means, component_covariances, n_samples):
+#
+#    assert component_means != None
+#    assert component_covariances != None
+#
+#    (n_components, d) = component_means.shape
+#    (n_components1, d1, d2) = component_covariances.shape
+#    assert n_components == n_components1
+#    assert d == d1
+#    assert d == d2
+#
+#    samples = np.zeros((n_samples, d))
+#    component_indices = np.zeros((n_samples,))
+#    for k in np.arange(n_samples):
+#        c = np.random.randint(n_components)
+#        component_indices[k] = c
+#        samples[k,:] = np.random.multivariate_normal(mean=component_means[c,:], cov=component_covariances[c,:,:])
+#        
+#    return (samples, component_indices)
 
 import refactor_gp
 import refactor_gp.gyom_utils
@@ -121,42 +120,42 @@ from refactor_gp.gyom_utils import mvnpdf
 from refactor_gp.gyom_utils import grad_mvnpdf
 from refactor_gp.gyom_utils import normalized_weighted_sum_with_log_coefficients
 
-def pdf(x, component_means, component_covariances):
+#def pdf(x, component_means, component_covariances):
+#
+#    d = x.shape[0]
+#    assert len(x.shape) == 1
+#    assert component_means != None
+#    assert component_covariances != None
+#
+#    (n_components, d1) = component_means.shape
+#    (n_components1, d2, d3) = component_covariances.shape
+#    assert n_components == n_components1
+#    assert (d,d,d) == (d1,d2,d3)
+#
+#    return np.array([mvnpdf(x,component_means[k,:],component_covariances[k,:,:]) for k in np.arange(n_components)]).mean()
 
-    d = x.shape[0]
-    assert len(x.shape) == 1
-    assert component_means != None
-    assert component_covariances != None
 
-    (n_components, d1) = component_means.shape
-    (n_components1, d2, d3) = component_covariances.shape
-    assert n_components == n_components1
-    assert (d,d,d) == (d1,d2,d3)
+#def grad_pdf(x, component_means, component_covariances = None):
+#
+#    d = x.shape[0]
+#    assert len(x.shape) == 1
+#    assert component_means != None
+#    assert component_covariances != None
+#
+#    (n_components, d1) = component_means.shape
+#    (n_components1, d2, d3) = component_covariances.shape
+#    assert n_components == n_components1
+#    assert (d,d,d) == (d1,d2,d3)
+#
+#    # Stack all the contributions from all the components in n_components rows.
+#    # Each row has d coefficients.
+#    # Collapse the columns by averaging.
+#    A = np.vstack([grad_mvnpdf(x,component_means[k,:],component_covariances[k,:,:]) for k in np.arange(n_components)])
+#    assert (n_components, d)== A.shape
+#    return A.mean(axis=0)
 
-    return np.array([mvnpdf(x,component_means[k,:],component_covariances[k,:,:]) for k in np.arange(n_components)]).mean()
-
-
-def grad_pdf(x, component_means, component_covariances = None):
-
-    d = x.shape[0]
-    assert len(x.shape) == 1
-    assert component_means != None
-    assert component_covariances != None
-
-    (n_components, d1) = component_means.shape
-    (n_components1, d2, d3) = component_covariances.shape
-    assert n_components == n_components1
-    assert (d,d,d) == (d1,d2,d3)
-
-    # Stack all the contributions from all the components in n_components rows.
-    # Each row has d coefficients.
-    # Collapse the columns by averaging.
-    A = np.vstack([grad_mvnpdf(x,component_means[k,:],component_covariances[k,:,:]) for k in np.arange(n_components)])
-    assert (n_components, d)== A.shape
-    return A.mean(axis=0)
-
-def grad_E(x, component_means, component_covariances):
-    return - grad_pdf(x, component_means, component_covariances) / pdf(x, component_means, component_covariances)
+#def grad_E(x, component_means, component_covariances):
+#    return - grad_pdf(x, component_means, component_covariances) / pdf(x, component_means, component_covariances)
 
 
 class MixtureMVN():
@@ -188,6 +187,23 @@ class MixtureMVN():
         res = normalized_weighted_sum_with_log_coefficients(logc, E, axis=0)
         assert res.shape == x.shape
         return res
+
+    def sample(self, n_samples, want_indices=False):
+
+        samples = np.zeros((n_samples, self.d))
+        component_indices = np.zeros((n_samples,))
+        for n in np.arange(n_samples):
+            c = np.random.randint(self.K)
+            component_indices[n] = c
+            samples[n,:] = np.random.multivariate_normal(mean=component_means[c,:], cov=component_covariances[c,:,:])
+
+        if want_indices:
+            return (samples, component_indices)
+        else:
+            return samples
+
+
+
 
 # If this is called, we'll just run a sanity check.
 def main():

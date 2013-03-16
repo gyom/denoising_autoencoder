@@ -51,6 +51,7 @@ def main(argv):
     langevin_stddev = None
     langevin_beta = None
     temperature = None
+    omit_asymmetric_proposal_factor = None
     want_overview_plots = False
 
     verbose = False
@@ -199,6 +200,7 @@ def main(argv):
                     quit()
                 return res
         else:
+            # This method has now been completely commented out. Let's keep it around only for a short time.
             def grad_E(x):
                 res = gaussian_mixture_tools.grad_E(x, extra_props['component_means'], extra_props['component_covariances'])
                 if np.any(np.isnan(res)):

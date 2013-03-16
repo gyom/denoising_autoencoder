@@ -2,6 +2,10 @@ import numpy as np
 import time
 import scipy
 
+import refactor_gp
+import refactor_gp.gyom_utils
+from refactor_gp.gyom_utils import make_progress_logger
+
 ######################################################################
 # This implementation is broken because it fails to compensate
 # for the densities in the jacobians. Anyways, it's a TODO.
@@ -59,11 +63,13 @@ def sample_chain(x0, N,
     iterate_N_times.accepted_counter = 0
     iterate_N_times.rejected_counter = 0
 
+    progress_logger = make_progress_logger("Sampling")
         
     for n in np.arange(0,N):
         current_x = iterate_N_times(current_x, energy_difference, thinning_factor)
         # collect sample after running through the thinning iterations
         samples_list.append(current_x)
+        progress_logger(1.0*n/N)
 
     samples = np.vstack(samples_list)
     acceptance_ratio = iterate_N_times.accepted_counter * 1.0 / (iterate_N_times.accepted_counter + iterate_N_times.rejected_counter)

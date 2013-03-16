@@ -101,8 +101,8 @@ def sample_chain(x0, N,
             else:
                 # This is a - in front of the energy difference because
                 # log( p(proposed_x) / p(current_x) ) \approx -E(proposed_x) - -E(current_x) = - energy_difference(proposed_x, current_x)
-                # loga = - energy_difference(proposed_x, current_x) / temperature + asymmetric_correction_log_factor
-                loga = - energy_difference(proposed_x, current_x) + asymmetric_correction_log_factor
+                loga = - energy_difference(proposed_x, current_x) / temperature + asymmetric_correction_log_factor
+                # loga = - energy_difference(proposed_x, current_x) + asymmetric_correction_log_factor
 
             if accept_all_proposals or loga >= 0.0 or loga >= np.log(np.random.uniform(0,1)):
                 # accepted !
