@@ -1,6 +1,9 @@
 
 ############################################################
 
+# This turns out to be more assoc than conj, but
+# it was just a prototype implementation for fun.
+# We'll see when it comes to mimicking actual clojure.
 def conj(E, o):
     if type(E) == list:
         return E + [o]
@@ -127,3 +130,9 @@ def grad_mvnpdf(x,m,covariance=None,precision=None,precision_det=None, want_log_
         return (log_mvnpdf(x,m,precision=precision,precision_det=precision_det), -1.0 * precision.dot(x-m))
     else:
         return mvnpdf(x,m,precision=precision,precision_det=precision_det) * -1.0 * precision.dot(x-m)
+
+####################################
+
+
+
+
