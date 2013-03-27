@@ -37,6 +37,7 @@ class Configuration():
 
         assert self.config_contents.has_key('jobs_id_counter')
         assert self.config_contents.has_key('jobs_list')
+        assert self.config_contents.has_key('jobs_runnable_queue')
 
         if not self.redis_server.ping():
             print "Cannot ping server. Exiting."

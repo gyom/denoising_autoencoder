@@ -1,5 +1,6 @@
 
 import cluster
+import os
 
 class Job(object):
     def __init__(self, id = None, config = None, database = None):
@@ -53,9 +54,11 @@ class Job(object):
         assert job_desc.has_key("dependencies")
         assert job_desc.has_key("cmdline")
 
-        for (k,v) in job_desc:
-            self.__dict__[k] = v
-            self.__the__keys.append(k)
+        for (k,v) in job_desc.items():
+            setattr(self, k, v)
+            self.__the_keys__.append(k)
+            # print k, v
+        return self
 
     def to_dict(self):
         "returns a structure that can be serialized into a json object"
@@ -71,5 +74,22 @@ class Job(object):
         self.database.save_job(self)
 
     def __str__(self):
-        s = "Job %d. Status : %s. Parent : %d. Depends on : %s.\ncmdline : %s" % (self.id, self.status, self.parent, self.dependencies, self.cmdline)
+        s = "Job %d. Status : %s. Parent : %s. Depends on : %s.\n    cmdline : %s" % (self.id, self.status, str(self.parent), self.dependencies, self.cmdline)
         return s
+
+
+
+def filter_runnable_jobs(L):
+
+    done_job_id_list = [job.id for job in L if job.status == "success"]
+
+    def can_this_job_run(job):
+        for p in job.dependencies:
+            if p not in done_job_id_list:
+                return False
+        return True
+
+    return [job for job in L if can_this_job_run(job) and job.status == "not_run"]
+
+
+

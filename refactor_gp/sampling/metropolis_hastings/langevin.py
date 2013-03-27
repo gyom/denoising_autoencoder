@@ -71,17 +71,17 @@ def sample_chain(x0, N,
             A[0] = - 0.5/langevin_stddev**2 * ((preimage_current_x - proposed_x)**2).sum()
             B[0] = - 0.5/langevin_stddev**2 * ((preimage_proposed_x - current_x)**2).sum()
             if proposal_noise_scheme == 'merge_x':
-                A[1] = -1 * np.linalg.det( (1-langevin_beta) * np.eye(d) +  langevin_beta * r_prime(preimage_current_x))
-                B[1] = -1 * np.linalg.det( (1-langevin_beta) * np.eye(d) +  langevin_beta * r_prime(preimage_proposed_x))
+                A[1] = -1 * np.log( np.linalg.det( (1-langevin_beta) * np.eye(d) +  langevin_beta * r_prime(preimage_current_x)) )
+                B[1] = -1 * np.log( np.linalg.det( (1-langevin_beta) * np.eye(d) +  langevin_beta * r_prime(preimage_proposed_x)) )
             elif proposal_noise_scheme == 'noise_E':
                 # clueless
-                A[1] = -1 * np.linalg.det( (-langevin_beta) * np.eye(d) + langevin_beta * r_prime(preimage_current_x))
-                B[1] = -1 * np.linalg.det( (-langevin_beta) * np.eye(d) + langevin_beta * r_prime(preimage_proposed_x))
+                A[1] = -1 * np.log( np.linalg.det( (-langevin_beta) * np.eye(d) + langevin_beta * r_prime(preimage_current_x)) )
+                B[1] = -1 * np.log( np.linalg.det( (-langevin_beta) * np.eye(d) + langevin_beta * r_prime(preimage_proposed_x)) )
                 #pass
             elif proposal_noise_scheme == 'noise_r':
                 # clueless
-                A[1] = -1 * np.linalg.det( langevin_beta * r_prime(preimage_current_x))
-                B[1] = -1 * np.linalg.det( langevin_beta * r_prime(preimage_proposed_x))
+                A[1] = -1 * np.log(  np.linalg.det( langevin_beta * r_prime(preimage_current_x)) )
+                B[1] = -1 * np.log( np.linalg.det( langevin_beta * r_prime(preimage_proposed_x)) )
                 #pass
             else:
                 raise("Unrecognized proposal_noise_scheme : %s" % proposal_noise_scheme)

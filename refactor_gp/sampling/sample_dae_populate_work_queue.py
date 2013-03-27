@@ -23,7 +23,8 @@ exact_grad_E_from_mixture_mvn_pickle = None
 L_pickled_dae_dir = ["/data/lisatmp2/alaingui/dae/dae_trained_models/gaussian_mixture_d10/experiment_13/%0.6d" % i for i in [18,23,29]]
 ##################
 
-experiment_name = "experiment_33_svd_normalized"
+#experiment_name = "experiment_34_MH_langevin"
+experiment_name = "experiment_34_MH_svd_unnormalized"
 def output_dir_generator(i):
     return "/data/lisatmp2/alaingui/dae/generated_samples/%s/%0.6d" % (experiment_name, i)
 
@@ -39,7 +40,7 @@ L_mcmc_method = ["MH_svd_grad_E"]
 
 L_langevin_stddev = [0.1, 0.01]
 L_fake_train_stddev = [0.1, 0.01]
-#L_langevin_beta = [0.1, 0.05
+#L_langevin_beta = [0.1, 0.05]
 L_langevin_beta = []
 L_omit_asymmetric_proposal_factor = [0,1]
 #L_proposal_noise_scheme = ['merge_x', 'noise_E', 'noise_r']

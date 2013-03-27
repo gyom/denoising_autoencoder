@@ -15,14 +15,32 @@ if not r_server.ping():
 # - the output_dir prefix
 # - probably stuff like n_hiddens to reflect better the dimensionality
 
-d = 10
+
 training_script_path = "/u/alaingui/umontreal/denoising_autoencoder/refactor_gp/models/train_dae.py"
-train_samples_pickle = "/data/lisatmp2/alaingui/dae/datasets/gaussian_mixture/d%d_eig0.1_comp25_001/train_samples.pkl" % d
-valid_samples_pickle = "/data/lisatmp2/alaingui/dae/datasets/gaussian_mixture/d%d_eig0.1_comp25_001/valid_samples.pkl" % d
 
-experiment_name = "experiment_14"
+#d = 10
+#train_samples_pickle = "/data/lisatmp2/alaingui/dae/datasets/gaussian_mixture/d%d_eig0.1_comp25_001/train_samples.pkl" % d
+#valid_samples_pickle = "/data/lisatmp2/alaingui/dae/datasets/gaussian_mixture/d%d_eig0.1_comp25_001/valid_samples.pkl" % d
 
-if d == 2:
+d = None
+train_samples_pickle = "/data/lisatmp2/alaingui/dae/datasets/mnist/train.pkl"
+valid_samples_pickle = "/data/lisatmp2/alaingui/dae/datasets/mnist/valid.pkl"
+
+experiment_name = "experiment_35_mnist"
+
+if (d is None) and (train_samples_pickle == "/data/lisatmp2/alaingui/dae/datasets/mnist/train.pkl"):
+
+    L_n_hiddens = [64, 128, 256]
+    L_maxiter = [10]
+    L_lbfgs_rank = [4]
+    L_act_func = [ '["tanh", "tanh"]', '["tanh", "id"]']
+
+    n_reps = 2
+
+    noise_stddevs = [np.exp(s*np.log(10.0)) for s in np.linspace(1,0,5)] + [np.exp(s*np.log(10.0)) for s in np.linspace(0,-2,20)]
+    want_early_termination = True
+
+elif d == 2:
 
     L_n_hiddens = [32, 64, 128]
     L_maxiter = [1000]
@@ -69,7 +87,10 @@ for n_hiddens in L_n_hiddens:
         for lbfgs_rank in L_lbfgs_rank:
             for act_func in L_act_func:
                 for r in range(n_reps):
-                    output_dir = "/data/lisatmp2/alaingui/dae/dae_trained_models/gaussian_mixture_d%d/%s/%0.6d" % (d, experiment_name, output_dir_counter)
+                    if (d is None) and (train_samples_pickle == "/data/lisatmp2/alaingui/dae/datasets/mnist/train.pkl"):
+                        output_dir = "/data/lisatmp2/alaingui/dae/dae_trained_models/gaussian_mixture_mnist/%s/%0.6d" % (experiment_name, output_dir_counter)
+                    else:
+                        output_dir = "/data/lisatmp2/alaingui/dae/dae_trained_models/gaussian_mixture_d%d/%s/%0.6d" % (d, experiment_name, output_dir_counter)
                     output_dir_counter += 1
 
                     params = (training_script_path, n_hiddens, maxiter, lbfgs_rank, act_func, str(noise_stddevs), train_samples_pickle, valid_samples_pickle, str(want_early_termination), output_dir)

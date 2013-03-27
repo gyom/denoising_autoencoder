@@ -19,6 +19,8 @@ import theano.tensor as T
 import refactor_gp
 import refactor_gp.gyom_utils
 from   refactor_gp.gyom_utils import conj
+from   refactor_gp.gyom_utils import make_progress_logger
+
 
 class DAE(object):
 
@@ -167,6 +169,8 @@ class DAE(object):
         seq_train_mean_best_U_q = []
         seq_valid_mean_best_U_q = []
         i = 0
+        progress_logger = make_progress_logger("Training")
+
         for train_stddev in list_of_train_stddev:
 
             sys.stdout.write("Using train_stddev %f, " % train_stddev)
@@ -210,6 +214,7 @@ class DAE(object):
                     early_termination_args['stop_if_loss_greater_than'][i] < mean_U_best_q):
                     break
 
+            progress_logger(1.0 * i / len(list_of_train_stddev))
             i += 1
         # end for
 

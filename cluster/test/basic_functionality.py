@@ -18,6 +18,8 @@ j0 = Job(id = -1, config = config, database = database)
 j1 = Job(id = -1)
 j2 = Job(id = -1)
 
+j2.dependencies = [j0.id, j1.id]
+
 database.save_job(j0)
 database.save_job(j1)
 database.save_job(j2)

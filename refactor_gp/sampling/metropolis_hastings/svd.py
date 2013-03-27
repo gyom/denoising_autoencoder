@@ -47,7 +47,7 @@ def sample_chain(x0, N,
 
     def proposal(current_x, preimage_current_x):
 
-        want_renormalization_of_J = True
+        want_renormalization_of_J = False
 
         d = current_x.shape[0]
 
@@ -98,13 +98,13 @@ def sample_chain(x0, N,
 
             A = np.zeros((2,))
             v = (preimage_current_x - proposed_x)
-            A[0] = - 0.5 * d * np.log(2 * np.pi) - 0.5 * np.log(det_JTJ) - 0.5 * v.dot(np.linalg.inv(J.T.dot(J))).dot(v)
-            A[1] = -1 * np.linalg.det( (1-langevin_beta) * np.eye(d) +  langevin_beta * r_prime(preimage_current_x))
+            A[0] = - 0.5 * d * np.log(2 * np.pi) - 0.5 * np.log(det_proposed_JTJ) - 0.5 * v.dot(np.linalg.inv(proposed_J.T.dot(proposed_J))).dot(v)
+            A[1] = -1 * np.log( np.linalg.det( (1-langevin_beta) * np.eye(d) +  langevin_beta * r_prime(preimage_current_x)) )
 
             B = np.zeros((2,))
             v = (preimage_proposed_x - current_x)
-            B[0] = - 0.5 * d * np.log(2 * np.pi) - 0.5 * np.log(det_proposed_JTJ) - 0.5 * v.dot(np.linalg.inv(proposed_J.T.dot(proposed_J))).dot(v)
-            B[1] = -1 * np.linalg.det( (1-langevin_beta) * np.eye(d) +  langevin_beta * r_prime(preimage_proposed_x))
+            B[0] = - 0.5 * d * np.log(2 * np.pi) - 0.5 * np.log(det_JTJ) - 0.5 * v.dot(np.linalg.inv(J.T.dot(J))).dot(v)
+            B[1] = -1 * np.log( np.linalg.det( (1-langevin_beta) * np.eye(d) +  langevin_beta * r_prime(preimage_proposed_x)) )
 
             asymmetric_correction_log_factor = A[0] + A[1] - B[0] - B[1]
         # end if omit_asymmetric_proposal_factor
