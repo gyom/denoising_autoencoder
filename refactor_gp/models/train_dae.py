@@ -1,4 +1,4 @@
-
+#!/bin/env python
 
 import numpy as np
 import os, sys, time
@@ -23,7 +23,7 @@ def main(argv):
     import json
 
     try:
-        opts, args = getopt.getopt(argv[1:], "hv", ["n_hiddens=", "maxiter=", "lbfgs_rank=", "act_func=", "noise_stddevs=", "train_samples_pickle=", "valid_samples_pickle=", "output_dir=", "want_early_termination="])
+        opts, args = getopt.getopt(argv[1:], "hv", ["n_hiddens=", "maxiter=", "lbfgs_rank=", "act_func=", "noise_stddevs=", "alt_valid_noise_stddevs=", "train_samples_pickle=", "valid_samples_pickle=", "test_samples_pickle=", "output_dir=", "want_early_termination=", "save_hidden_units=", "resume_dae_pickle="])
     except getopt.GetoptError as err:
         # print help information and exit:
         print str(err) # will print something like "option -a not recognized"
@@ -35,10 +35,15 @@ def main(argv):
     lbfgs_rank = None
     act_func = None
     noise_stddevs = None
+    alt_valid_noise_stddevs = None
     train_samples_pickle = None
     valid_samples_pickle = None
+    test_samples_pickle = None
     output_dir = None
     want_early_termination = False
+    # used for multilayers
+    save_hidden_units = False
+    resume_dae_pickle = None
 
     verbose = False
     for o, a in opts:
@@ -62,14 +67,25 @@ def main(argv):
             assert type(noise_stddevs) in [list, float, int]
             if type(noise_stddevs) in [float, int]:
                 noise_stddevs = [noise_stddevs]
+        elif o in ("--alt_valid_noise_stddevs"):
+            alt_valid_noise_stddevs = json.loads(a)
+            assert type(alt_valid_noise_stddevs) in [list, float, int]
+            if type(alt_valid_noise_stddevs) in [float, int]:
+                alt_valid_noise_stddevs = [alt_valid_noise_stddevs]
         elif o in ("--train_samples_pickle"):
             train_samples_pickle = a
         elif o in ("--valid_samples_pickle"):
             valid_samples_pickle = a
+        elif o in ("--test_samples_pickle"):
+            test_samples_pickle = a
         elif o in ("--output_dir"):
             output_dir = a
         elif o in ("--want_early_termination"):
             want_early_termination = ((a == "True") or (a == "true") or (a=="1"))
+        elif o in ("--save_hidden_units"):
+            save_hidden_units = ((a == "True") or (a == "true") or (a=="1"))
+        elif o in ("--resume_dae_pickle"):
+            resume_dae_pickle = a
         else:
             assert False, "unhandled option"
  
@@ -89,11 +105,19 @@ def main(argv):
     else:
         valid_samples = None
 
+
     from dae_untied_weights import DAE_untied_weights
 
-    mydae = DAE_untied_weights(n_inputs = n_inputs,
-                               n_hiddens = n_hiddens,
-                               act_func = act_func)
+    if resume_dae_pickle is not None:
+        assert os.path.exists(resume_dae_pickle)
+        mydae = DAE_untied_weights(dae_pickle_file = resume_dae_pickle)
+        if n_hiddens is not None:
+            assert mydae.n_hiddens == n_hiddens
+            assert mydae.n_inputs  == n_inputs
+    else:
+        mydae = DAE_untied_weights(n_inputs = n_inputs,
+                                   n_hiddens = n_hiddens,
+                                   act_func = act_func)
 
     #mydae.fit_with_decreasing_noise(mnist_train_data[0:2000,:],
     #                                [0.1, 0.05, 0.01, 0.001],
@@ -108,13 +132,15 @@ def main(argv):
     else:
         early_termination_args = {}
 
-    (train_model_losses, valid_model_losses, post_valid_model_losses) = mydae.fit_with_decreasing_noise(train_samples,
-                                                                                                        noise_stddevs,
-                                                                                                        {'method' : 'fmin_l_bfgs_b',
-                                                                                                         'maxiter' : maxiter,
-                                                                                                         'm':lbfgs_rank},
-                                                                                                        early_termination_args,
-                                                                                                        X_valid = valid_samples)
+    (train_model_losses, valid_model_losses, post_valid_model_losses, post_alt_valid_model_losses) = \
+        mydae.fit_with_decreasing_noise(train_samples,
+                                        noise_stddevs,
+                                        {'method' : 'fmin_l_bfgs_b',
+                                         'maxiter' : maxiter,
+                                         'm':lbfgs_rank},
+                                        early_termination_args,
+                                        X_valid = valid_samples,
+                                        list_of_additional_valid_stddev = alt_valid_noise_stddevs)
     #print "post_valid_model_losses"
     #print post_valid_model_losses
     #print
@@ -147,6 +173,13 @@ def main(argv):
     mydae.save_pickle(trained_model_pickle_file)
     print "Wrote trained DAE in %s" % (trained_model_pickle_file,)
 
+    if test_samples_pickle:
+        assert os.path.exists(test_samples_pickle)
+        test_samples = cPickle.load(open(test_samples_pickle, 'rb'))
+        assert train_samples.shape[1] == test_samples.shape[1]
+    else:
+        test_samples = None
+
 
     extra_pickle_file = os.path.join(output_dir, "extra_details.pkl")
     extra_json_file = os.path.join(output_dir, "extra_details.json")
@@ -157,12 +190,28 @@ def main(argv):
                      'act_func':act_func,
                      'noise_stddevs':noise_stddevs,
                      'train_samples_pickle':train_samples_pickle,
+                     'valid_samples_pickle':valid_samples_pickle,
+                     'test_samples_pickle':test_samples_pickle,
                      'model_losses':model_losses,
                      'train_model_losses':train_model_losses,
                      'valid_model_losses':valid_model_losses,
                      'post_valid_model_losses':post_valid_model_losses,
+                     'post_alt_valid_model_losses':post_alt_valid_model_losses,
                      'computational_cost_in_seconds':computational_cost_in_seconds,
                      'early_termination_occurred':early_termination_occurred}
+
+    if save_hidden_units:
+        for (samples, prefix) in [(train_samples, 'train'),
+                                  (valid_samples, 'valid'),
+                                  (test_samples,  'test')]:
+            if samples is not None:
+                hidden_units = mydae.encode(samples)
+                hidden_units_pickle_file = os.path.join(output_dir, "%s_hidden_units.pkl" % (prefix,))
+                extra_details['%s_hidden_units_pickle' % (prefix,)] = hidden_units_pickle_file
+                cPickle.dump(hidden_units, open(hidden_units_pickle_file, "w"))
+                print "Wrote %s" % (hidden_units_pickle_file,)
+                del hidden_units
+                del hidden_units_pickle_file
 
     cPickle.dump(extra_details, open(extra_pickle_file, "w"))
     json.dump(extra_details, open(extra_json_file, "w"), sort_keys=True, indent=4, separators=(',', ': '))

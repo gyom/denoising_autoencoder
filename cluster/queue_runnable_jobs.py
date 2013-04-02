@@ -10,7 +10,7 @@ from   cluster.job import Job
 from   cluster.job import filter_runnable_jobs
 
 
-import os, sys, time
+import os, sys
 
 def usage():
     pass

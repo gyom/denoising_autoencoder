@@ -18,13 +18,14 @@ class Database():
     def get_all_job_ids(self):
         i = 0
         #N = self.config.redis_server.llen(self.config.config_contents['jobs_list'])
-        N = self.config.redis_server.zcard(self.config.config_contents['jobs_list'])
+        N = self.config.redis_server.scard(self.config.config_contents['jobs_list'])
         if N == 0:
             return []
         else:
             #return self.config.redis_server.lrange(self.config.config_contents['jobs_list'], 0, N-1)
             #return self.config.redis_server.srandmember(self.config.config_contents['jobs_list'], N)
-            return self.config.redis_server.zrange(self.config.config_contents['jobs_list'], 0, -1)
+            return self.config.redis_server.smembers(self.config.config_contents['jobs_list'])
+            #return self.config.redis_server.zrange(self.config.config_contents['jobs_list'], 0, -1)
 
     def get_all_jobs(self):
         return [self.load_job(job_id) for job_id in self.get_all_job_ids()]
@@ -45,6 +46,7 @@ class Database():
 
     def save_job(self, job):
         self.config.redis_server.set(job.id, json.dumps(job.to_dict()))
-        self.config.redis_server.zadd(self.config.config_contents['jobs_list'], job.id, 0)
+        self.config.redis_server.sadd(self.config.config_contents['jobs_list'], job.id)
+        #self.config.redis_server.zadd(self.config.config_contents['jobs_list'], job.id, 0)
         print "saved job %d to database" % job.id
         

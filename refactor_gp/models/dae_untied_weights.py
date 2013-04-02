@@ -26,7 +26,8 @@ class DAE_untied_weights(DAE):
                  Wc=None, Wb=None,
                  c=None,  b=None,
                  s=None, act_func=['tanh', 'tanh'],
-                 want_constant_s = False):
+                 want_constant_s = False,
+                 dae_pickle_file=None):
         """
         Initialize a DAE.
         
@@ -61,6 +62,9 @@ class DAE_untied_weights(DAE):
         # parameters into the first constructor.
         # This would avoid potential issues with saving/loading
         # trained DAEs.
+        if dae_pickle_file:
+            self.load_pickle(dae_pickle_file)
+            return
 
         # These values are to be treated as READ-ONLY,
         # but they're actually modified when we load the

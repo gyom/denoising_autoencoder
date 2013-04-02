@@ -124,7 +124,7 @@ class DAE(object):
         return (best_q, U(best_q))
 
     def fit_with_decreasing_noise(self, X, list_of_train_stddev,
-                                  optimization_args, early_termination_args = {}, X_valid = None):
+                                  optimization_args, early_termination_args = {}, X_valid = None, list_of_additional_valid_stddev = None):
         """
         The 'optimization_args' filters through to the 'fit' function almost unchanged.
 
@@ -173,7 +173,7 @@ class DAE(object):
 
         for train_stddev in list_of_train_stddev:
 
-            sys.stdout.write("Using train_stddev %f, " % train_stddev)
+            sys.stdout.write("    Using train_stddev %f, " % train_stddev)
             noisy_X = X + np.random.normal(size = X.shape, scale = train_stddev)
 
             if optimization_args.has_key('maxiter') and type(optimization_args['maxiter']) in [list, np.array]:
@@ -190,16 +190,14 @@ class DAE(object):
 
             train_mean_U_best_q = train_U_best_q / X.shape[0]
             seq_train_mean_best_U_q.append(train_mean_U_best_q)
-            sys.stdout.write("train mean loss is %f" % (train_mean_U_best_q,))
-            print ""
+            sys.stdout.write("train mean loss is %f, " % (train_mean_U_best_q,))
 
             if not (X_valid == None):
                 noisy_X_valid = X_valid + np.random.normal(size = X_valid.shape, scale = train_stddev)
                 valid_U_best_q = self.q_loss(best_q, X_valid, noisy_X_valid).sum()
                 valid_mean_U_best_q = valid_U_best_q / X_valid.shape[0]
                 seq_valid_mean_best_U_q.append(valid_mean_U_best_q)
-                sys.stdout.write("valid mean loss is %f" % (valid_mean_U_best_q,))
-                print ""
+                sys.stdout.write("valid mean loss is %f." % (valid_mean_U_best_q,))
 
                 # if we're dealing with a validation set, it will be the one used
                 # to determine the stopping point
@@ -214,6 +212,7 @@ class DAE(object):
                     early_termination_args['stop_if_loss_greater_than'][i] < mean_U_best_q):
                     break
 
+            print ""
             progress_logger(1.0 * i / len(list_of_train_stddev))
             i += 1
         # end for
@@ -232,6 +231,9 @@ class DAE(object):
         # how the DAE treats data that's relatively far from the manifold
         # once it's done training.
         # It might be even more informative than the validation losses.
+        
+        seq_valid_mean_U_final_best_q = None
+        seq_alt_valid_mean_U_final_best_q = None
         if not (X_valid == None):
             nreps = 10
             seq_valid_mean_U_final_best_q = [np.array([self.q_loss(best_q,
@@ -239,10 +241,16 @@ class DAE(object):
                                                                    X_valid + np.random.normal(size = X_valid.shape, scale = train_stddev)).sum() / X_valid.shape[0]
                                                        for _ in range(nreps)]).mean()
                                              for train_stddev in list_of_train_stddev]
-        else:
-            seq_valid_mean_U_final_best_q = None
 
-        return (seq_train_mean_best_U_q, seq_valid_mean_best_U_q, seq_valid_mean_U_final_best_q)
+            if (list_of_additional_valid_stddev is not None) and len(list_of_additional_valid_stddev) > 0:
+                seq_alt_valid_mean_U_final_best_q = [np.array([self.q_loss(best_q,
+                                                                           X_valid,
+                                                                           X_valid + np.random.normal(size = X_valid.shape, scale = alt_valid_stddev)).sum() / X_valid.shape[0]
+                                                            for _ in range(nreps)]).mean()
+                                                     for alt_valid_stddev in list_of_additional_valid_stddev]
+        # end if
+
+        return (seq_train_mean_best_U_q, seq_valid_mean_best_U_q, seq_valid_mean_U_final_best_q, seq_alt_valid_mean_U_final_best_q)
 
 def main():
     pass
