@@ -38,21 +38,32 @@ def grad_E(X):
 def main():
 
     N = 1000
-    Na = N*0.3/1.5
+    Na = N*0.3/1.5/2
     Nb = N - Na
-    print "(N, Na, Nb) = (%d, %d, %d)" % (N, Na, Nb)
     #domain = np.linspace(-1.2, 1.2, 1000)
     domain = np.linspace(-1.5, 1.5, 1000)
-    output_dir = "/u/alaingui/Dropbox/umontreal/denoising_autoencoder/iclr2013_paper/presentation"
+    print "(N, Na, Nb) = (%d, %d, %d)" % (N, Na, Nb)
+    print "[domain[Na], domain[Nb]] = [%f, %f]" % (domain[Na], domain[Nb])
+    output_dir = "/u/alaingui/Dropbox/umontreal/denoising_autoencoder/iclr2013_paper/presentation/grad_movie_3"
 
     # ground truth for all three plots
     legend_names = {"pdf":r"$p(x)$", "E":r"$E(x)$", "grad_E":r"$\nabla E(x)$"}
     colors = {"pdf":"#f62c9e", "E":"#0e7410", "grad_E":"#0e7410"}
     for (name, func) in [("pdf", f), ("E", E), ("grad_E", grad_E)]:
         pylab.hold(True)
-        pa = pylab.plot(domain, func(domain), linestyle="-", color=colors[name], linewidth="4")
-        if name == "grad_E":
+        if name in ["pdf"]:
+            pa = pylab.plot(domain, func(domain), linestyle="-", color=colors[name], linewidth="4")
+        elif name in ["E", "grad_E"]:
+            #pa = pylab.plot(domain[Na:Nb], func(domain[Na:Nb]), linestyle="-", color=colors[name], linewidth="4")
+            pa = pylab.plot(domain, func(domain), linestyle="-", color=colors[name], linewidth="4")
+            pylab.xlim([domain[0], domain[-1]])
+
+        if name in ["E"]:
+            pylab.ylim([0,4])
+
+        if name in ["grad_E"]:
             pylab.plot(domain, np.zeros(domain.shape), linestyle="--", color="#000000", linewidth="2")
+            pylab.ylim([-4,3])
 
         pylab.legend([pa], [legend_names[name]],loc=4)
 
@@ -62,23 +73,33 @@ def main():
         print "Wrote %s" % (output_file,)
         pylab.close()
 
+    #quit()
 
     # combined graphs CAE DAE for grad_E
     #noise_stddevs = [1.0, 0.7, 0.1, 0.07, 0.01]
-    noise_stddevs = np.exp(np.linspace(0, -4.6, 10))
-    for noise_stddev in noise_stddevs:
+    n_frames = 100
+    noise_stddevs = np.exp(np.linspace(0, -4.6, n_frames))
+    for (noise_stddev, i) in zip(noise_stddevs, range(n_frames)):
         r_cae = infinite_capacity.fit_cae_1D(domain, f(domain), noise_stddev)
         r_dae = infinite_capacity.fit_dae_1D(domain, f(domain), noise_stddev)
 
         pylab.hold(True)
-        pa = pylab.plot(domain[Na:Nb], grad_E(domain[Na:Nb]), linestyle="-", color="#0e7410", linewidth="4", label=r"$\nabla E(x)$")
-        pb = pylab.plot(domain[Na:Nb], -(r_cae[Na:Nb] - domain[Na:Nb])/noise_stddev**2, linestyle="-", color="#f9a21d", linewidth="4", label=r"CAE $\left(r(x)-x\right)/\sigma^2$")
-        pc = pylab.plot(domain[Na:Nb], -(r_dae[Na:Nb] - domain[Na:Nb])/noise_stddev**2, linestyle="-", color="#411ced", linewidth="4", label=r"DAE $\left(r(x)-x\right)/\sigma^2$")
-        pylab.legend([pa,pb,pc], [r"$\nabla E(x)$", r"CAE $\left(r(x)-x\right)/\sigma^2$", r"DAE $\left(r(x)-x\right)/\sigma^2$"], loc=4)
+
+        #pa = pylab.plot(domain[Na:Nb], grad_E(domain[Na:Nb]), linestyle="-", color="#0e7410", linewidth="4", label=r"$\nabla E(x)$")
+        #pb = pylab.plot(domain[Na:Nb], -(r_cae[Na:Nb] - domain[Na:Nb])/noise_stddev**2, linestyle="-", color="#f9a21d", linewidth="4", label=r"CAE $\left(r(x)-x\right)/\sigma^2$")
+        #pc = pylab.plot(domain[Na:Nb], -(r_dae[Na:Nb] - domain[Na:Nb])/noise_stddev**2, linestyle="-", color="#411ced", linewidth="4", label=r"DAE $\left(r(x)-x\right)/\sigma^2$")
+        pa = pylab.plot(domain, grad_E(domain), linestyle="-", color="#0e7410", linewidth="4", label=r"$\nabla E(x)$")
+        pb = pylab.plot(domain, -(r_cae - domain)/noise_stddev**2, linestyle="-", color="#f9a21d", linewidth="4", label=r"CAE $ - \left(r(x)-x\right)/\sigma^2$")
+        pc = pylab.plot(domain, -(r_dae - domain)/noise_stddev**2, linestyle="-", color="#411ced", linewidth="4", label=r"DAE $ - \left(r(x)-x\right)/\sigma^2$")
+
+        pylab.legend([pa,pb,pc], [r"$\nabla E(x)$", r"CAE $ - \left(r(x)-x\right)/\sigma^2$", r"DAE $ - \left(r(x)-x\right)/\sigma^2$"], loc=4)
         pylab.plot(domain, np.zeros(domain.shape), linestyle="--", color="#000000", linewidth="2")
         pylab.text(-1.0, 2.0, r"$\sigma = %0.2f$" % noise_stddev, fontsize=30)
+        pylab.xlim([domain[0], domain[-1]])
+        pylab.ylim([-4,3])
         pylab.draw()
-        output_file = os.path.join(output_dir, "combined_grad_E_noise_stddev_%0.3f.png" % noise_stddev)
+        output_file = os.path.join(output_dir, "combined_grad_E_frame_%0.3d.png" % i)
+        #output_file = os.path.join(output_dir, "combined_grad_E_noise_stddev_%0.3f.png" % noise_stddev)
         pylab.savefig(output_file, dpi=200)
         print "Wrote %s" % (output_file,)
         pylab.close()
