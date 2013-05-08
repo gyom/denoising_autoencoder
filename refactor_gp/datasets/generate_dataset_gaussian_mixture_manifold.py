@@ -7,7 +7,7 @@ import gaussian_mixture_tools
 
 import refactor_gp
 import refactor_gp.gyom_utils
-from gyom_utils import conj
+from   refactor_gp.gyom_utils import conj
 
 
 def sample_manifold_components(d, n_components, ratio_eigvals):
@@ -31,7 +31,6 @@ def sample_manifold_components(d, n_components, ratio_eigvals):
         #else:
         #    f = lambda t: np.cos(np.pi*2*freq_multiplier * t)**exponent
         component_means[:,i] = f(domain_t)
-        
 
     covariance_matrices = gaussian_mixture_tools.generate_collection_covariance_matrices(component_means, ratio_eigvals)
 
@@ -40,7 +39,7 @@ def sample_manifold_components(d, n_components, ratio_eigvals):
 
 
 def usage():
-    print "-- python generate_dataset_gaussian_mixture_manifold.py --d=50 --n_train=10000 --n_test=10000 --ratio_eigvals=0.1 --n_components=25 --output_dir=/data/lisatmp2/alaingui/dae/datasets/gaussian_mixture/0001"
+    print "-- python generate_dataset_gaussian_mixture_manifold.py --d=50 --n_train=10000 --n_valid=10000 --n_test=10000 --ratio_eigvals=0.1 --n_components=25 --output_dir=/data/lisatmp2/alaingui/dae/datasets/gaussian_mixture/0001"
     print ""
 
 def main(argv):
@@ -110,7 +109,13 @@ def main(argv):
     assert component_means != None
     assert component_covariances != None
 
-    (samples, component_indices) = gaussian_mixture_tools.sample_from_mixture(component_means, component_covariances, n_train + n_valid + n_test)
+    # updated method
+    mixturemvn = gaussian_mixture_tools.MixtureMVN(component_means, component_covariances)
+    (samples, component_indices) = mixturemvn.sample(n_train + n_valid + n_test, want_indices=True)
+
+    # deprecated method
+    #(samples, component_indices) = gaussian_mixture_tools.sample_from_mixture(component_means, component_covariances, n_train + n_valid + n_test)
+    
     end_time = time.time()
     computational_cost_in_seconds = int(end_time - start_time)
     print "Sampling took %d seconds." % computational_cost_in_seconds

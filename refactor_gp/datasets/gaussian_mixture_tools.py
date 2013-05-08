@@ -195,7 +195,7 @@ class MixtureMVN():
         for n in np.arange(n_samples):
             c = np.random.randint(self.K)
             component_indices[n] = c
-            samples[n,:] = np.random.multivariate_normal(mean=component_means[c,:], cov=component_covariances[c,:,:])
+            samples[n,:] = np.random.multivariate_normal(mean=self.means[c,:], cov=self.covariances[c,:,:])
 
         if want_indices:
             return (samples, component_indices)
