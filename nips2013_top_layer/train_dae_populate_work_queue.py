@@ -3,7 +3,8 @@
 import redis
 import numpy as np
 
-r_server = redis.Redis("localhost", 6379)
+#r_server = redis.Redis("localhost", 6379)
+r_server = redis.Redis("eos2", 6379)
 
 if not r_server.ping():
     print "Cannot ping server. Exiting."
@@ -22,30 +23,34 @@ d = None
 train_samples_pickle = "/data/lisatmp2/alaingui/mnist/yann/yann_train_H1.pkl"
 valid_samples_pickle = "/data/lisatmp2/alaingui/mnist/yann/yann_valid_H1.pkl"
 
-experiment_name = "experiment_01_yann_mnist"
+experiment_name = "experiment_03_yann_mnist_H1"
 
 if (d == None) and train_samples_pickle == "/data/lisatmp2/alaingui/mnist/yann/yann_train_H1.pkl":
 
-    L_n_hiddens = [128, 256]
-    L_maxiter = [10]
-    L_lbfgs_rank = [4,10]
-    L_act_func = [ '["tanh", "sigmoid"]', '["sigmoid", "sigmoid"]']
+    L_n_hiddens = [128, 256, 512]
+    L_maxiter = [20,100]
+    L_lbfgs_rank = [8,32]
+    #L_act_func = [ '["tanh", "sigmoid"]', '["sigmoid", "sigmoid"]']
+    L_act_func = [ '["sigmoid", "sigmoid"]']
     n_reps = 2
 
-    S = [np.exp(s*np.log(10.0)) for s in np.linspace(1,0,5)] + [np.exp(s*np.log(10.0)) for s in np.linspace(0,-1,10)]
+    S      = [np.exp(s*np.log(10.0)) for s in np.linspace(1,0,7)] + [np.exp(s*np.log(10.0)) for s in np.linspace(0,-1,13)]
+    S_gentle_valid = [np.exp(s*np.log(10.0)) for s in np.linspace(1,0,20)]
+    assert len(S) == len(S_gentle_valid)
     #noise_stddevs = {'train' : [], 'valid' : [], 'wider_valid' : []
     noise_stddevs = {}
     noise_stddevs['train'] = [{'target':s, 'sampled':s} for s in S]
     noise_stddevs['valid'] = [{'target':s, 'sampled':s} for s in S]
-    noise_stddevs['wider_valid'] = [{'target':s, 'sampled':10*s} for s in S]
+    noise_stddevs['gentle_valid'] = [{'target':s, 'sampled':s} for s in S_gentle_valid]
+    noise_stddevs['wider_gentle_valid'] = [{'target':s, 'sampled':10*s} for s in S_gentle_valid]
 
 else:
     quit()
 
 output_dir_counter = 0
 
-for n_hiddens in L_n_hiddens:
-    for maxiter in L_maxiter:
+for maxiter in L_maxiter:
+    for n_hiddens in L_n_hiddens:
         for lbfgs_rank in L_lbfgs_rank:
             for act_func in L_act_func:
                 for r in range(n_reps):
@@ -57,4 +62,4 @@ for n_hiddens in L_n_hiddens:
 
                     print command
                     print
-                    #r_server.rpush("train_gaussian_mixture", command)
+                    r_server.rpush("train_yann_mnist", command)

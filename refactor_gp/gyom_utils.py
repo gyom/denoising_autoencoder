@@ -175,11 +175,24 @@ def isotropic_gaussian_noise_and_importance_sampling_weights(X, sampled_stddev, 
     delta_X = np.random.normal(size = X.shape, scale = sampled_stddev)
     noisy_X = X + delta_X
 
-    if target_stddev is None:
+    if (target_stddev is None) or (target_stddev == sampled_stddev):
         importance_sampling_weights = np.ones((X.shape[0],))
+        importance_sampling_weights = importance_sampling_weights / importance_sampling_weights.sum()
         return (noisy_X, importance_sampling_weights)
     else:
         assert target_stddev > 0
-        importance_sampling_weights = sampled_stddev / target_stddev * np.exp(-0.5*delta_X.sum(axis=1)*(1/target_stddev**2 - 1/sampled_stddev**2))
+        # Usually we'd use
+        # importance_sampling_weights = sampled_stddev / target_stddev * np.exp(-0.5*delta_X.sum(axis=1)*(1/target_stddev**2 - 1/sampled_stddev**2))
+        # and renormalize afterwards.
+        # However, this creates underflow problems so we can factor out
+        # the largest element of S = delta_X.sum(axis=1)
+        # as done in the usual method of renormalizing exp(some_array).
+        S = delta_X.sum(axis=1)
+        S = S - S.max()
+        importance_sampling_weights = sampled_stddev / target_stddev * np.exp(-0.5*S*(1/target_stddev**2 - 1/sampled_stddev**2))
+        # Let's renormalize the importance weights to keep them under check.
+        # There is no reason behind this other than to keep the error term from
+        # turning into something insane (as it seems to do right now).
+        importance_sampling_weights = importance_sampling_weights / importance_sampling_weights.sum()
         return (noisy_X, importance_sampling_weights)
 

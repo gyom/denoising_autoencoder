@@ -118,12 +118,12 @@ class DAE_untied_weights(DAE):
         # the same shape (instead of being transposed) to
         # avoid disturbing the code as much as possible.
 
-        Wb = T.dmatrix('Wb')
-        Wc = T.dmatrix('Wc')
-        b = T.dvector('b')
-        c = T.dvector('c')
-        s = T.dvector('s')
-        x = T.dmatrix('x')
+        Wb = T.matrix('Wb')
+        Wc = T.matrix('Wc')
+        b = T.vector('b')
+        c = T.vector('c')
+        s = T.vector('s')
+        x = T.matrix('x')
     
         h_act = T.dot(x, Wc) + c
         if self.act_func[0] == 'tanh':
@@ -147,11 +147,11 @@ class DAE_untied_weights(DAE):
         else:
             raise("Invalid act_func[1]")
 
-        importance_sampling_weights = T.dvector('importance_sampling_weights')
+        importance_sampling_weights = T.vector('importance_sampling_weights')
 
         # Another variable to be able to call a function
         # with a noisy x and compare it to a reference x.
-        y = T.dmatrix('y')
+        y = T.matrix('y')
 
         # Make importance_sampling_weights have a broadcastable dimension
         # to multiply all the reconstructed components.
@@ -170,16 +170,16 @@ class DAE_untied_weights(DAE):
         #                    so it's not a "vectorial" function.
 
         self.theano_encode_decode = function([Wb,Wc,b,c,s,x], r)
-        self.theano_loss = function([Wb,Wc,b,c,s,x,y,importance_sampling_weights], loss)
+        self.theano_loss = function([Wb,Wc,b,c,s,x,y,importance_sampling_weights], loss, allow_input_downcast=True)
 
         self.theano_gradients = function([Wb,Wc,b,c,s,x,y,importance_sampling_weights],
                                          [T.grad(sum_loss, Wb), T.grad(sum_loss, Wc),
                                           T.grad(sum_loss, b),  T.grad(sum_loss, c),
-                                          T.grad(sum_loss, s)])
+                                          T.grad(sum_loss, s)], allow_input_downcast=True)
         # other useful theano functions for the experiments that involve
         # adding noise to the hidden states
-        self.theano_encode = function([Wc,c,x], h)
-        self.theano_decode = function([Wb,b,s,h], r)
+        self.theano_encode = function([Wc,c,x], h, allow_input_downcast=True)
+        self.theano_decode = function([Wb,b,s,h], r, allow_input_downcast=True)
 
 
     def encode(self, X):
@@ -216,12 +216,12 @@ class DAE_untied_weights(DAE):
 
     def theano_setup_flat(self):
     
-        Wb = T.dmatrix('Wb')
-        Wc = T.dmatrix('Wc')
-        b = T.dvector('b')
-        c = T.dvector('c')
-        s = T.dvector('s')
-        x = T.dvector('x')
+        Wb = T.matrix('Wb')
+        Wc = T.matrix('Wc')
+        b = T.vector('b')
+        c = T.vector('c')
+        s = T.vector('s')
+        x = T.vector('x')
     
         h_act = T.dot(x, Wc) + c
         if self.act_func[0] == 'tanh':
@@ -299,14 +299,14 @@ class DAE_untied_weights(DAE):
         (Wb, Wc, b, c, s) = DAE_untied_weights.read_params_from_q(q, self.n_inputs, self.n_hiddens)
 
         if importance_sampling_weights is None:
-            importance_sampling_weights = np.ones((X.shape[0],))
+            importance_sampling_weights = np.ones((X.shape[0],), dtype=np.float32)
 
         (grad_Wb, grad_Wc, grad_b, grad_c, grad_s) = self.theano_gradients(Wb, Wc, b, c, s, noisy_X, X, importance_sampling_weights)
 
         # There might be a simpler way with theano to do this,
         # but this seems like a good approach.
         if self.want_constant_s:
-            grad_s = np.zeros((grad_s.shape))
+            grad_s = np.zeros((grad_s.shape), dtype=np.float32)
 
         return DAE_untied_weights.serialize_params_as_q(grad_Wb, grad_Wc, grad_b, grad_c, grad_s)
 
@@ -314,7 +314,7 @@ class DAE_untied_weights(DAE):
         (Wb, Wc, b, c, s) = DAE_untied_weights.read_params_from_q(q, self.n_inputs, self.n_hiddens)
 
         if importance_sampling_weights is None:
-            importance_sampling_weights = np.ones((X.shape[0],))
+            importance_sampling_weights = np.ones((X.shape[0],), dtype=np.float32)
 
         return self.theano_loss(Wb, Wc, b, c, s, noisy_X, X, importance_sampling_weights)
 

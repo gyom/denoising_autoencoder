@@ -75,11 +75,11 @@ class DAE(object):
 
         def U(q):
             # because theano_loss is a vectorial function, we have to sum()
-            return self.q_loss(q, X, noisy_X, importance_sampling_weights).sum()
+            return np.float64(self.q_loss(q, X, noisy_X, importance_sampling_weights).sum())
 
         def grad_U(q):
             # because theano_gradients is NOT a vectorial function, no need so sum()
-            return self.q_grad(q, X, noisy_X, importance_sampling_weights)
+            return np.float64(self.q_grad(q, X, noisy_X, importance_sampling_weights))
 
         # Read the initial state from q.
         # This means that we can call the "fit" function
@@ -125,7 +125,6 @@ class DAE(object):
 
     def fit_with_stddevs_sequence(self, X, X_valid, stddevs,
                                   optimization_args):
-
         """
         stddevs has fields 'train', 'valid' and any number of other variants on 'valid'.
         The special key is 'train', used for training.
@@ -199,22 +198,22 @@ class DAE(object):
             train_target_stddev = stddevs['train'][m]['target']
             train_sampled_stddev = stddevs['train'][m]['sampled']
 
-            sys.stdout.write("    Using train_stddev (target, sampled) = (%f, %f), " % (train_target_stddev, train_sampled_stddev)
+            sys.stdout.write("\n    Using train_stddev (target, sampled) = (%f, %f), " % (train_target_stddev, train_sampled_stddev))
             (noisy_X, importance_sampling_weights) = isotropic_gaussian_noise_and_importance_sampling_weights(X, train_target_stddev, train_sampled_stddev)
 
             (best_q, train_U_best_q) = self.fit(X, noisy_X, importance_sampling_weights, optimization_args)
 
             train_mean_U_best_q = train_U_best_q / X.shape[0]
             best_q_mean_losses['train'].append(train_mean_U_best_q)
-            sys.stdout.write("train mean loss is %f, " % (train_mean_U_best_q,))
+            sys.stdout.write("train mean loss is %f\n, " % (train_mean_U_best_q,))
 
-        
+
             if X_valid is not None:
 
                 for key in stddevs.keys():
                     if key == 'train':
                         continue
-                
+
                     some_valid_target_stddev = stddevs[key][m]['target']
                     some_valid_sampled_stddev = stddevs[key][m]['sampled']
 
@@ -224,10 +223,10 @@ class DAE(object):
                         best_q_mean_losses[key].append(None)
                         continue
 
-                    sys.stdout.write("    Using %s stddev (target, sampled) = (%f, %f), " % (str(key), some_valid_target_stddev, some_valid_sampled_stddev)
+                    sys.stdout.write("\n    Using %s stddev (target, sampled) = (%f, %f), " % (str(key), some_valid_target_stddev, some_valid_sampled_stddev))
                     (noisy_X_valid, importance_sampling_weights) = isotropic_gaussian_noise_and_importance_sampling_weights(X_valid, some_valid_sampled_stddev, some_valid_target_stddev)
 
-                    some_valid_U_best_q = self.q_loss(best_q, X, noisy_X_valid, importance_sampling_weights).sum()
+                    some_valid_U_best_q = self.q_loss(best_q, X_valid, noisy_X_valid, importance_sampling_weights).sum()
 
                     # Notice : Despite the importance_sampling_weights being used,
                     # I think that we are still doing the right thing by normalizing by
@@ -238,7 +237,7 @@ class DAE(object):
 
                     some_valid_mean_U_best_q = some_valid_U_best_q / X_valid.shape[0]
                     best_q_mean_losses[key].append(some_valid_mean_U_best_q)
-                    sys.stdout.write("%s mean loss is %f, " % (str(key), some_valid_mean_U_best_q,))
+                    sys.stdout.write("%s mean loss is %f\n" % (str(key), some_valid_mean_U_best_q,))
 
                     progress_logger(1.0 * (m+1) / M)
 
