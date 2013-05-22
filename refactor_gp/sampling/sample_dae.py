@@ -122,27 +122,85 @@ def main(argv):
         mydae.load_pickle(pickled_dae_file)
         extra_details = cPickle.load(open(pickled_dae_extra_file, "r"))
 
-        # Here's an example of what extra_details contains.
-        """
-        {'act_func': [u'tanh', u'id'],
-        'computational_cost_in_seconds': 373,
-        'early_termination_occurred': True,
-        'lbfgs_rank': 4,
-        'maxiter': 1000,
-        'model_losses': [0.88493400434004688,  0.085861144685915214,  0.014545763882193379,  0.0033357369919251481,  0.0003573931475000403,  3.3169528288705622e-05,  nan,  nan,  nan,  nan],
-        'n_hiddens': 30,
-        'n_inputs': 10,
-        'noise_stddevs': [1.0,  0.2782559402207124,  0.07742636826811268,  0.02154434690031883,  0.005994842503189405,  0.0016681005372000581,  0.00046415888336127757,  0.00012915496650148825,  3.5938136638046215e-05,  9.99999999999998e-06],
-        'train_samples_pickle': '/data/lisatmp2/alaingui/dae/datasets/gaussian_mixture/d10_eig0.1_comp25_001/train_samples.pkl'}
-        """
-
         n_inputs = extra_details['n_inputs']
         n_hiddens = extra_details['n_hiddens']
 
+        # At this point we have a compatibility problem.
+        # The older method of proceeding was by reading the train_stddev
+        # using extra_details['model_losses'] and extra_details['noise_stddevs']
+        # but now these structures are more complicated.
+        #
+        # This next if block is about building a list L of pairs
+        # that will read the information from both methods (old and new)
+        # so we can feed it to the actual code right after.
+
+        if ((type(extra_details['model_losses']) == list) and
+            (type(extra_details['noise_stddevs']) == list)):
+            # old
+            L = zip(extra_details['model_losses'], extra_details['noise_stddevs'])
+
+            # Here's an example of what extra_details contains.
+            """
+            {'act_func': [u'tanh', u'id'],
+            'computational_cost_in_seconds': 373,
+            'early_termination_occurred': True,
+            'lbfgs_rank': 4,
+            'maxiter': 1000,
+            'model_losses': [0.88493400434004688,  0.085861144685915214,  0.014545763882193379,  0.0033357369919251481,  0.0003573931475000403,  3.3169528288705622e-05,  nan,  nan,  nan,  nan],
+            'n_hiddens': 30,
+            'n_inputs': 10,
+            'noise_stddevs': [1.0,  0.2782559402207124,  0.07742636826811268,  0.02154434690031883,  0.005994842503189405,  0.0016681005372000581,  0.00046415888336127757,  0.00012915496650148825,  3.5938136638046215e-05,  9.99999999999998e-06],
+            'train_samples_pickle': '/data/lisatmp2/alaingui/dae/datasets/gaussian_mixture/d10_eig0.1_comp25_001/train_samples.pkl'}
+            """
+
+
+        else:
+            # new
+
+            L = zip(extra_details['model_losses']['train'],
+                    [e['target'] for e in extra_details['noise_stddevs']['train']])
+
+            """
+            "act_func": [
+            "sigmoid",
+            "sigmoid"
+            ],
+            "computational_cost_in_seconds": 12221,
+            "lbfgs_rank": 8,
+            "maxiter": 100,
+            "model_losses": {
+                "gentle_valid": [
+                    0.0028618150711059568,
+                    0.0028551105499267579,
+                    0.0028442161560058594, ...],
+            "train": [
+                    0.00053718544006347657,
+                    0.00053839420318603514,
+                    0.00054026546478271487, ...],
+            "valid": [
+                    0.0028635965347290041,
+                    0.0028334093093872071,
+                    0.0028069316864013671, ...]
+            "wider_gentle_valid": [
+                    0.0036463272094726562,
+                    0.0047698848724365235, ...]
+            },
+            "noise_stddevs": {
+                "gentle_valid": [
+                    {
+                        "sampled": 10.000000000000002,
+                        "target": 10.000000000000002
+                    },
+                    {
+                        "sampled": 8.85866790410083,
+                        "target": 8.85866790410083
+                    },
+            """
+
+
         # Get the last value for which we don't have 'nan' as value.
         train_stddev = None
-        for (loss, noise_stddev) in zip(extra_details['model_losses'],
-                                        extra_details['noise_stddevs']):
+        for (loss, noise_stddev) in L:
             if np.isnan(loss):
                 break
             else:

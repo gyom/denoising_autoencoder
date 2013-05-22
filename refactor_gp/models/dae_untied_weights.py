@@ -169,7 +169,7 @@ class DAE_untied_weights(DAE):
         #                    which involves the all data X summed
         #                    so it's not a "vectorial" function.
 
-        self.theano_encode_decode = function([Wb,Wc,b,c,s,x], r)
+        self.theano_encode_decode = function([Wb,Wc,b,c,s,x], r, allow_input_downcast=True)
         self.theano_loss = function([Wb,Wc,b,c,s,x,y,importance_sampling_weights], loss, allow_input_downcast=True)
 
         self.theano_gradients = function([Wb,Wc,b,c,s,x,y,importance_sampling_weights],
