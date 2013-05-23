@@ -1,0 +1,10 @@
+
+{
+        "root_dir_jobs":"/data/lisatmp2/alaingui/cluster_jobs_test",
+        "redis_server_host":"eos2.iro.umontreal.ca",
+        "redis_server_password":"8383hjfjhdf874ndu63jhdfi73k",
+        "jobs_list":"jobs_list",
+        "jobs_id_counter":"jobs_id_counter",
+        "jobs_runnable_queue":"jobs_runnable_queue",
+        "script_run_next_job":"/u/alaingui/umontreal/denoising_autoencoder/cluster/run_next_job.py"
+}

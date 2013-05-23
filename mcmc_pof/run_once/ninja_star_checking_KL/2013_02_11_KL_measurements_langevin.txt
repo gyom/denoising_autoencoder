@@ -1,0 +1,32 @@
+Got the samples. Acceptance ratio was 1.000000
+We got a KL divergence value of 0.009872
+Got the samples. Acceptance ratio was 1.000000
+We got a KL divergence value of 0.001923
+Got the samples. Acceptance ratio was 1.000000
+We got a KL divergence value of 0.005500
+Got the samples. Acceptance ratio was 1.000000
+We got a KL divergence value of 0.006650
+Got the samples. Acceptance ratio was 1.000000
+We got a KL divergence value of -0.001006
+Got the samples. Acceptance ratio was 1.000000
+We got a KL divergence value of 0.005540
+Got the samples. Acceptance ratio was 1.000000
+We got a KL divergence value of 0.002343
+Got the samples. Acceptance ratio was 1.000000
+We got a KL divergence value of 0.004923
+Got the samples. Acceptance ratio was 1.000000
+We got a KL divergence value of 0.002134
+Got the samples. Acceptance ratio was 1.000000
+We got a KL divergence value of 0.000908
+Got the samples. Acceptance ratio was 1.000000
+We got a KL divergence value of -0.000224
+Got the samples. Acceptance ratio was 1.000000
+We got a KL divergence value of 0.002912
+Got the samples. Acceptance ratio was 1.000000
+We got a KL divergence value of 0.002822
+Got the samples. Acceptance ratio was 1.000000
+We got a KL divergence value of -0.000633
+Got the samples. Acceptance ratio was 1.000000
+We got a KL divergence value of 0.005406
+Got the samples. Acceptance ratio was 1.000000
+We got a KL divergence value of 0.000513
