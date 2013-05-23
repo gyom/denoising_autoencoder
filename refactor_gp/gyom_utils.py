@@ -196,3 +196,101 @@ def isotropic_gaussian_noise_and_importance_sampling_weights(X, sampled_stddev, 
         importance_sampling_weights = importance_sampling_weights / importance_sampling_weights.sum()
         return (noisy_X, importance_sampling_weights)
 
+
+def isotropic_gaussian_noise_with_kicking(X, sampled_stddev, kicking_stddev, p):
+    """
+    Generates a noisy_X array with the same shape as X but
+    with added isotropic gaussian noise.
+    Every point has a chance p of having a greater
+    noise stddev given by 'kicking_stddev' instead.
+
+    Assumes that
+        X.shape is (nbr_of_points, dimension_of_points)
+
+    Returns noisy_X
+    where
+        noisy_X.shape == X.shape
+    """
+
+    assert 0.0 <= p and p <= 1.0
+    assert sampled_stddev >= 0.0
+
+    # Values of b are 1 iff we want kicking. Otherwise they're 0.
+    b = (np.random.uniform(low = 0.0, high = 1.0, size = X.shape[0]) < p)*1.0
+    b = np.tile(b.reshape((X.shape[0],1)), (1,X.shape[1]))
+
+    delta_X = (b * sampled_stddev + (1-b) * kicking_stddev) * np.random.normal(size = X.shape)
+    noisy_X = X + delta_X
+
+    return noisy_X
+
+
+def isotropic_gaussian_noise_with_walkback(X, sampled_stddev, walkback_vector_func, p=None, steps=None, min_steps=0, cutoff=10):
+    """
+    Generates a noisy_X array with the same shape as X but
+    with a varying number of applications of noise+reconstruct.
+
+    The 'walkback_vector_func' function takes an array
+    of size X.shape as argument and returns another of the
+    same size. Conceptually, it performs an action that
+    counteracts additive gaussian noise of stddev 'stddev'.
+
+    We can either specify a fixed number of steps or a 'p'
+    being the parameter from a geometric distribution
+    that controls the number of steps performed for each point.
+
+    'min_steps' is an offset, the minimum number of walkback steps
+
+    'cutoff' is the minimum number of elements at which we stop
+    bothering and return whatever we have. No point doing the
+    walking stuff when we are left with 10 elements, for example.
+
+    Assumes that
+        X.shape is (nbr_of_points, dimension_of_points)
+
+    Returns noisy_X
+    where
+        noisy_X.shape == X.shape
+    """
+
+    assert 0.0 <= p and p < 1.0
+    assert sampled_stddev >= 0.0
+    assert min_steps >= 0
+    assert cutoff >= 0
+
+    def f(start, end):
+        noisy_X[start:end,:] = noisy_X[start:end,:] + sampled_stddev * np.random.normal(size = X[start:end,:].shape)
+        noisy_X[start:end,:] = walkback_vector_func(noisy_X[start:end,:])
+
+    def update_start(start,end):
+        # think about how if p=0.9 then we basically
+        # want to be done as soon as possible, and this
+        # makes 1.0*(end-start)*p be almost equal to end-start
+        # which means that you update 'start' to reach 'end'
+        # really quickly
+        return min(end, int(start + 1.0*(end-start)*p))
+
+    noisy_X = X
+
+    start = 0
+    end = X.shape[0]
+
+    for _ in range(min_steps):
+        f(start,end)
+
+    while True:
+        start = update_start(start, end)
+        if (start + cutoff >= end):
+            break
+        else:
+            f(start,end)
+
+    # And then, finally, we add noise on everything.
+    # It would have been possible to start with the noise
+    # and then use a function f(start,end) that did reconstruct+noise
+    # instead of noise+reconstruct, but it's equivalent here if
+    # we end with noise on everything.
+    noisy_X = noisy_X + sampled_stddev * np.random.normal(size = X.shape)
+
+    return noisy_X
+

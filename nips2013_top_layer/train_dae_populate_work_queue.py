@@ -20,29 +20,57 @@ if not r_server.ping():
 training_script_path = "/u/alaingui/umontreal/denoising_autoencoder/refactor_gp/models/train_dae.py"
 
 d = None
-train_samples_pickle = "/data/lisatmp2/alaingui/mnist/yann/yann_train_H1.pkl"
-valid_samples_pickle = "/data/lisatmp2/alaingui/mnist/yann/yann_valid_H1.pkl"
+debug = False
+if debug:
+    train_samples_pickle = "/data/lisatmp2/alaingui/mnist/yann/yann_train_H1_trim_100.pkl"
+    valid_samples_pickle = "/data/lisatmp2/alaingui/mnist/yann/yann_valid_H1_trim_100.pkl"
+else:
+    train_samples_pickle = "/data/lisatmp2/alaingui/mnist/yann/yann_train_H1_trim_10000.pkl"
+    #train_samples_pickle = "/data/lisatmp2/alaingui/mnist/yann/yann_train_H1.pkl"
+    valid_samples_pickle = "/data/lisatmp2/alaingui/mnist/yann/yann_valid_H1.pkl"
 
-experiment_name = "experiment_03_yann_mnist_H1"
+#experiment_name = "experiment_05_yann_mnist_H1_kicking"
+#experiment_name = "experiment_05_yann_mnist_H1_walkback"
 
-if (d == None) and train_samples_pickle == "/data/lisatmp2/alaingui/mnist/yann/yann_train_H1.pkl":
+if True:
 
     L_n_hiddens = [128, 256, 512]
-    L_maxiter = [20,100]
-    L_lbfgs_rank = [8,32]
+    L_maxiter = [20]
+    L_lbfgs_rank = [8]
     #L_act_func = [ '["tanh", "sigmoid"]', '["sigmoid", "sigmoid"]']
     L_act_func = [ '["sigmoid", "sigmoid"]']
-    n_reps = 2
+    n_reps = 4
 
-    S      = [np.exp(s*np.log(10.0)) for s in np.linspace(1,0,7)] + [np.exp(s*np.log(10.0)) for s in np.linspace(0,-1,13)]
-    S_gentle_valid = [np.exp(s*np.log(10.0)) for s in np.linspace(1,0,20)]
-    assert len(S) == len(S_gentle_valid)
-    #noise_stddevs = {'train' : [], 'valid' : [], 'wider_valid' : []
-    noise_stddevs = {}
-    noise_stddevs['train'] = [{'target':s, 'sampled':s} for s in S]
-    noise_stddevs['valid'] = [{'target':s, 'sampled':s} for s in S]
-    noise_stddevs['gentle_valid'] = [{'target':s, 'sampled':s} for s in S_gentle_valid]
-    noise_stddevs['wider_gentle_valid'] = [{'target':s, 'sampled':10*s} for s in S_gentle_valid]
+
+    mode = 1
+
+    if mode == 1:
+        experiment_name = "experiment_05_yann_mnist_H1_normal"
+        S      = [np.exp(s*np.log(10.0)) for s in np.linspace(1,0,7)] + [np.exp(s*np.log(10.0)) for s in np.linspace(0,-2,13)]
+        noise_stddevs = {}
+        noise_stddevs['train'] = [{'target':s, 'sampled':s} for s in S]
+        noise_stddevs['valid'] = [{'target':s, 'sampled':s} for s in S]
+        noise_stddevs['valid_kicking'] = [{'sampled':s, 'kicking':10*s, 'kicking_param_p':0.10} for s in S]
+        noise_stddevs['valid_walkback'] = [{'sampled':s, 'walkback_param_p':0.50} for s in S]
+        noise_stddevs['gentle_valid'] = [{'target':10*s, 'sampled':10*s} for s in S]
+    elif mode == 2:
+        experiment_name = "experiment_05_yann_mnist_H1_kicking"
+        S      = [np.exp(s*np.log(10.0)) for s in np.linspace(1,0,7)] + [np.exp(s*np.log(10.0)) for s in np.linspace(0,-2,13)]
+        noise_stddevs = {}
+        noise_stddevs['train'] = [{'sampled':s, 'kicking':10*s, 'kicking_param_p':0.10} for s in S]
+        noise_stddevs['valid'] = [{'target':s, 'sampled':s} for s in S]
+        noise_stddevs['valid_kicking'] = [{'sampled':s, 'kicking':10*s, 'kicking_param_p':0.10} for s in S]
+        noise_stddevs['valid_walkback'] = [{'sampled':s, 'walkback_param_p':0.50} for s in S]
+        noise_stddevs['gentle_valid'] = [{'target':10*s, 'sampled':10*s} for s in S]
+    elif mode == 3:
+        experiment_name = "experiment_05_yann_mnist_H1_walkback"
+        S      = [np.exp(s*np.log(10.0)) for s in np.linspace(1,0,7)] + [np.exp(s*np.log(10.0)) for s in np.linspace(0,-2,13)]
+        noise_stddevs = {}
+        noise_stddevs['train'] = [{'sampled':s, 'walkback_param_p':0.50} for s in S]
+        noise_stddevs['valid'] = [{'target':s, 'sampled':s} for s in S]
+        noise_stddevs['valid_kicking'] = [{'sampled':s, 'kicking':10*s, 'kicking_param_p':0.10} for s in S]
+        noise_stddevs['valid_walkback'] = [{'sampled':s, 'walkback_param_p':0.50} for s in S]
+        noise_stddevs['gentle_valid'] = [{'target':10*s, 'sampled':10*s} for s in S]
 
 else:
     quit()

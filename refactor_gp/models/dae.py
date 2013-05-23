@@ -21,7 +21,8 @@ import refactor_gp.gyom_utils
 from   refactor_gp.gyom_utils import conj
 from   refactor_gp.gyom_utils import make_progress_logger
 from   refactor_gp.gyom_utils import isotropic_gaussian_noise_and_importance_sampling_weights
-
+from   refactor_gp.gyom_utils import isotropic_gaussian_noise_with_kicking
+from   refactor_gp.gyom_utils import isotropic_gaussian_noise_with_walkback
 
 class DAE(object):
 
@@ -156,31 +157,14 @@ class DAE(object):
         Returns the losses for all the stddevs. The variable 'best_q_mean_losses'.
         """
 
-        def validate_the_stddevs_argument(stddevs):
-            """
-            Let's just validate the thing for now and add flexibility later.
-            Note : This function gets everything from its arguments (not using closure).
-            """
-            assert stddevs.has_key('train')
-            M = len(stddevs['train'])
-            for key in stddevs.keys():
-                assert type(stddevs[key]) == type([])
-                assert M == len(stddevs[key])
-                # turn any string "None" into a real None
-                stddevs[key] = [None if e == "None" else e for e in stddevs[key]]
-                for e in stddevs[key]:
-                    # Allow for e to be None.
-                    # For example, if you only want the validation errors
-                    # for the final iteration, you don't want to be computing
-                    # it at every step along the way. This is what None is for.
-                    if e is not None:
-                        assert e.has_key('target')
-                        assert e.has_key('sampled')
-
         validate_the_stddevs_argument(stddevs)
 
-        progress_logger = make_progress_logger("Training")
 
+        # the walkback_vector_func is the function r(x) that
+        # we have from this DAE
+        walkback_vector_func = lambda X: self.encode_decode(X)
+
+        progress_logger = make_progress_logger("Training")
 
         best_q_mean_losses = dict([(key, []) for key in stddevs.keys()])
         # Summary :
@@ -195,18 +179,14 @@ class DAE(object):
         M = len(stddevs['train'])
         for m in range(0, M):
 
-            train_target_stddev = stddevs['train'][m]['target']
-            train_sampled_stddev = stddevs['train'][m]['sampled']
-
-            sys.stdout.write("\n    Using train_stddev (target, sampled) = (%f, %f), " % (train_target_stddev, train_sampled_stddev))
-            (noisy_X, importance_sampling_weights) = isotropic_gaussian_noise_and_importance_sampling_weights(X, train_target_stddev, train_sampled_stddev)
+            e = stddevs['train'][m]
+            (noisy_X, importance_sampling_weights) = get_noisy_X_and_importance_weights(X, e, walkback_vector_func)
 
             (best_q, train_U_best_q) = self.fit(X, noisy_X, importance_sampling_weights, optimization_args)
 
             train_mean_U_best_q = train_U_best_q / X.shape[0]
             best_q_mean_losses['train'].append(train_mean_U_best_q)
-            sys.stdout.write("train mean loss is %f\n, " % (train_mean_U_best_q,))
-
+            sys.stdout.write("        train mean loss is %f\n" % (train_mean_U_best_q,))
 
             if X_valid is not None:
 
@@ -214,17 +194,12 @@ class DAE(object):
                     if key == 'train':
                         continue
 
-                    some_valid_target_stddev = stddevs[key][m]['target']
-                    some_valid_sampled_stddev = stddevs[key][m]['sampled']
-
-                    if some_valid_sampled_stddev is None:
-                        # it's fine if some_valid_target_stddev is None
-                        # so we're not testing for that
+                    e = stddevs[key][m]
+                    if e['sampled'] is None:
                         best_q_mean_losses[key].append(None)
                         continue
 
-                    sys.stdout.write("\n    Using %s stddev (target, sampled) = (%f, %f), " % (str(key), some_valid_target_stddev, some_valid_sampled_stddev))
-                    (noisy_X_valid, importance_sampling_weights) = isotropic_gaussian_noise_and_importance_sampling_weights(X_valid, some_valid_sampled_stddev, some_valid_target_stddev)
+                    (noisy_X_valid, importance_sampling_weights) = get_noisy_X_and_importance_weights(X_valid, e, walkback_vector_func)
 
                     some_valid_U_best_q = self.q_loss(best_q, X_valid, noisy_X_valid, importance_sampling_weights).sum()
 
@@ -237,12 +212,13 @@ class DAE(object):
 
                     some_valid_mean_U_best_q = some_valid_U_best_q / X_valid.shape[0]
                     best_q_mean_losses[key].append(some_valid_mean_U_best_q)
-                    sys.stdout.write("%s mean loss is %f\n" % (str(key), some_valid_mean_U_best_q,))
+                    sys.stdout.write("        %s mean loss is %f\n" % (str(key), some_valid_mean_U_best_q,))
 
                     progress_logger(1.0 * (m+1) / M)
 
         return best_q_mean_losses
 
+    # THIS FUNCTION IS DEPRECATED.
     def fit_with_decreasing_noise(self, X, list_of_train_stddev,
                                   optimization_args, early_termination_args = {}, X_valid = None, list_of_additional_valid_stddev = None):
         """
@@ -378,6 +354,55 @@ class DAE(object):
         # end if
 
         return (seq_train_mean_best_U_q, seq_valid_mean_best_U_q, seq_valid_mean_U_final_best_q, seq_alt_valid_mean_U_final_best_q)
+
+
+
+
+def get_noisy_X_and_importance_weights(X, e, walkback_vector_func = None):
+    if (e.has_key('target') and e.has_key('sampled')):
+        sys.stdout.write("    Using stddev (sampled, target) = (%f, %f),\n" % (e['sampled'], e['target']))
+        (noisy_X, importance_sampling_weights) = isotropic_gaussian_noise_and_importance_sampling_weights(X, e['sampled'], e['target'])
+
+    elif (e.has_key('sampled') and e.has_key('kicking') and e.has_key('kicking_param_p')):
+        noisy_X = isotropic_gaussian_noise_with_kicking(X, e['sampled'], e['kicking'], e['kicking_param_p'])
+        importance_sampling_weights = np.ones((noisy_X.shape[0],))
+    elif (e.has_key('sampled') and e.has_key('walkback_param_p')):
+        assert walkback_vector_func is not None
+        noisy_X = isotropic_gaussian_noise_with_walkback(X, e['sampled'], walkback_vector_func, e['walkback_param_p'], min_steps=0, cutoff=10)
+        importance_sampling_weights = np.ones((noisy_X.shape[0],))
+    else:
+        print "Error : Unrecognized setup."
+        print e
+        quit()
+
+    return (noisy_X, importance_sampling_weights)
+
+
+
+def validate_the_stddevs_argument(stddevs):
+    """
+    Let's just validate the thing for now and add flexibility later.
+    Note : This function gets everything from its arguments (not using closure).
+    """
+    assert stddevs.has_key('train')
+    M = len(stddevs['train'])
+    for key in stddevs.keys():
+        assert type(stddevs[key]) == type([])
+        assert M == len(stddevs[key])
+        # turn any string "None" into a real None
+        stddevs[key] = [None if e == "None" else e for e in stddevs[key]]
+        for e in stddevs[key]:
+            # Allow for e to be None.
+            # For example, if you only want the validation errors
+            # for the final iteration, you don't want to be computing
+            # it at every step along the way. This is what None is for.
+            if e is not None:
+                assert ( (e.has_key('target') and e.has_key('sampled')) or
+                         (e.has_key('sampled') and e.has_key('kicking') and e.has_key('kicking_param_p')) or
+                         (e.has_key('sampled') and e.has_key('walkback_param_p')))
+
+
+
 
 def main():
     pass
