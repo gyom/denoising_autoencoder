@@ -253,7 +253,7 @@ def isotropic_gaussian_noise_with_walkback(X, sampled_stddev, walkback_vector_fu
         noisy_X.shape == X.shape
     """
 
-    assert 0.0 <= p and p < 1.0
+    assert 0.0 <= p and p <= 1.0
     assert sampled_stddev >= 0.0
     assert min_steps >= 0
     assert cutoff >= 0
@@ -278,12 +278,13 @@ def isotropic_gaussian_noise_with_walkback(X, sampled_stddev, walkback_vector_fu
     for _ in range(min_steps):
         f(start,end)
 
-    while True:
-        start = update_start(start, end)
-        if (start + cutoff >= end):
-            break
-        else:
-            f(start,end)
+    if p < 1.0:
+        while True:
+            start = update_start(start, end)
+            if (start + cutoff >= end):
+                break
+            else:
+                f(start,end)
 
     # And then, finally, we add noise on everything.
     # It would have been possible to start with the noise

@@ -153,12 +153,11 @@ def main(argv):
             'train_samples_pickle': '/data/lisatmp2/alaingui/dae/datasets/gaussian_mixture/d10_eig0.1_comp25_001/train_samples.pkl'}
             """
 
-
         else:
             # new
 
             L = zip(extra_details['model_losses']['train'],
-                    [e['target'] for e in extra_details['noise_stddevs']['train']])
+                    [(e['target'] if e.has_key('target') else e['sampled']) for e in extra_details['noise_stddevs']['train']])
 
             """
             "act_func": [

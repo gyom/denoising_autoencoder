@@ -39,38 +39,49 @@ if True:
     L_lbfgs_rank = [8]
     #L_act_func = [ '["tanh", "sigmoid"]', '["sigmoid", "sigmoid"]']
     L_act_func = [ '["sigmoid", "sigmoid"]']
-    n_reps = 4
+    n_reps = 20
 
+    mode = 4
 
-    mode = 1
-
+    kicking_param_p = 0.5
+    walkback_param_p = 0.1
     if mode == 1:
-        experiment_name = "experiment_05_yann_mnist_H1_normal"
+        experiment_name = "experiment_08_yann_mnist_H1_normal"
         S      = [np.exp(s*np.log(10.0)) for s in np.linspace(1,0,7)] + [np.exp(s*np.log(10.0)) for s in np.linspace(0,-2,13)]
         noise_stddevs = {}
         noise_stddevs['train'] = [{'target':s, 'sampled':s} for s in S]
         noise_stddevs['valid'] = [{'target':s, 'sampled':s} for s in S]
-        noise_stddevs['valid_kicking'] = [{'sampled':s, 'kicking':10*s, 'kicking_param_p':0.10} for s in S]
-        noise_stddevs['valid_walkback'] = [{'sampled':s, 'walkback_param_p':0.50} for s in S]
+        noise_stddevs['valid_kicking'] = [{'sampled':s, 'kicking':10*s, 'kicking_param_p':kicking_param_p} for s in S]
+        noise_stddevs['valid_walkback'] = [{'sampled':s, 'walkback_param_p':walkback_param_p} for s in S]
         noise_stddevs['gentle_valid'] = [{'target':10*s, 'sampled':10*s} for s in S]
     elif mode == 2:
-        experiment_name = "experiment_05_yann_mnist_H1_kicking"
+        experiment_name = "experiment_08_yann_mnist_H1_kicking"
         S      = [np.exp(s*np.log(10.0)) for s in np.linspace(1,0,7)] + [np.exp(s*np.log(10.0)) for s in np.linspace(0,-2,13)]
         noise_stddevs = {}
-        noise_stddevs['train'] = [{'sampled':s, 'kicking':10*s, 'kicking_param_p':0.10} for s in S]
+        noise_stddevs['train'] = [{'sampled':s, 'kicking':10*s, 'kicking_param_p':kicking_param_p} for s in S]
         noise_stddevs['valid'] = [{'target':s, 'sampled':s} for s in S]
-        noise_stddevs['valid_kicking'] = [{'sampled':s, 'kicking':10*s, 'kicking_param_p':0.10} for s in S]
-        noise_stddevs['valid_walkback'] = [{'sampled':s, 'walkback_param_p':0.50} for s in S]
+        noise_stddevs['valid_kicking'] = [{'sampled':s, 'kicking':10*s, 'kicking_param_p':kicking_param_p} for s in S]
+        noise_stddevs['valid_walkback'] = [{'sampled':s, 'walkback_param_p':walkback_param_p} for s in S]
         noise_stddevs['gentle_valid'] = [{'target':10*s, 'sampled':10*s} for s in S]
     elif mode == 3:
-        experiment_name = "experiment_05_yann_mnist_H1_walkback"
+        experiment_name = "experiment_08_yann_mnist_H1_walkback"
         S      = [np.exp(s*np.log(10.0)) for s in np.linspace(1,0,7)] + [np.exp(s*np.log(10.0)) for s in np.linspace(0,-2,13)]
         noise_stddevs = {}
-        noise_stddevs['train'] = [{'sampled':s, 'walkback_param_p':0.50} for s in S]
+        noise_stddevs['train'] = [{'sampled':s, 'walkback_param_p':walkback_param_p} for s in S]
         noise_stddevs['valid'] = [{'target':s, 'sampled':s} for s in S]
-        noise_stddevs['valid_kicking'] = [{'sampled':s, 'kicking':10*s, 'kicking_param_p':0.10} for s in S]
-        noise_stddevs['valid_walkback'] = [{'sampled':s, 'walkback_param_p':0.50} for s in S]
+        noise_stddevs['valid_kicking'] = [{'sampled':s, 'kicking':10*s, 'kicking_param_p':kicking_param_p} for s in S]
+        noise_stddevs['valid_walkback'] = [{'sampled':s, 'walkback_param_p':walkback_param_p} for s in S]
         noise_stddevs['gentle_valid'] = [{'target':10*s, 'sampled':10*s} for s in S]
+    elif mode == 4:
+        experiment_name = "experiment_08_yann_mnist_H1_walkback2"
+        S      = [np.exp(s*np.log(10.0)) for s in np.linspace(1,0,7)] + [np.exp(s*np.log(10.0)) for s in np.linspace(0,-2,13)]
+        noise_stddevs = {}
+        noise_stddevs['train'] = [{'sampled':s, 'walkback_param_p':2*walkback_param_p} for s in S]
+        noise_stddevs['valid'] = [{'target':s, 'sampled':s} for s in S]
+        noise_stddevs['valid_kicking'] = [{'sampled':s, 'kicking':10*s, 'kicking_param_p':kicking_param_p} for s in S]
+        noise_stddevs['valid_walkback'] = [{'sampled':s, 'walkback_param_p':walkback_param_p} for s in S]
+        noise_stddevs['gentle_valid'] = [{'target':10*s, 'sampled':10*s} for s in S]
+
 
 else:
     quit()

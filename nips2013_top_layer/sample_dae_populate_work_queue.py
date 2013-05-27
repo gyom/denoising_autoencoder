@@ -17,20 +17,33 @@ exact_grad_E_from_mixture_mvn_pickle = None
 #exact_grad_E_from_mixture_mvn_pickle = "/data/lisatmp2/alaingui/dae/datasets/gaussian_mixture/d10_eig0.1_comp25_001/train_samples_extra.pkl"
 #exact_grad_E_from_mixture_mvn_pickle = "/data/lisatmp2/alaingui/dae/datasets/gaussian_mixture/d2_eig0.1_comp25_001/train_samples_extra.pkl"
 
-L_pickled_dae_dir = ["/data/lisatmp2/alaingui/dae/dae_trained_models/mnist_yann_H1/experiment_03_yann_mnist_H1/%0.6d" % i for i in [23, 19, 22, 17, 18, 16]]
+#L_pickled_dae_dir = ["/data/lisatmp2/alaingui/dae/dae_trained_models/mnist_yann_H1/experiment_03_yann_mnist_H1/%0.6d" % i for i in [23, 19, 22, 17, 18, 16]]
 #L_pickled_dae_dir = ["/data/lisatmp2/alaingui/dae/dae_trained_models/mnist_yann_H1/experiment_03_yann_mnist_H1/%0.6d" % i for i in [0, 4, 1, 3, 6, 5, 2, 7]]
+
+
+L_pickled_dae_dir = ['/data/lisatmp2/alaingui/dae/dae_trained_models/mnist_yann_H1/experiment_08_yann_mnist_H1_walkback/000036',
+                     '/data/lisatmp2/alaingui/dae/dae_trained_models/mnist_yann_H1/experiment_08_yann_mnist_H1_walkback/000022',
+                     '/data/lisatmp2/alaingui/dae/dae_trained_models/mnist_yann_H1/experiment_08_yann_mnist_H1_walkback/000026',
+                     '/data/lisatmp2/alaingui/dae/dae_trained_models/mnist_yann_H1/experiment_08_yann_mnist_H1_walkback/000034',
+                     '/data/lisatmp2/alaingui/dae/dae_trained_models/mnist_yann_H1/experiment_08_yann_mnist_H1_walkback/000015',
+                     '/data/lisatmp2/alaingui/dae/dae_trained_models/mnist_yann_H1/experiment_08_yann_mnist_H1_walkback2/000043',
+                     '/data/lisatmp2/alaingui/dae/dae_trained_models/mnist_yann_H1/experiment_08_yann_mnist_H1_walkback2/000046',
+                     '/data/lisatmp2/alaingui/dae/dae_trained_models/mnist_yann_H1/experiment_08_yann_mnist_H1_walkback2/000059',
+                     '/data/lisatmp2/alaingui/dae/dae_trained_models/mnist_yann_H1/experiment_08_yann_mnist_H1_walkback2/000048',
+                     '/data/lisatmp2/alaingui/dae/dae_trained_models/mnist_yann_H1/experiment_08_yann_mnist_H1_walkback2/000045']
+
 ##################
 
 #experiment_name = "experiment_34_MH_langevin"
-experiment_name = "experiment_03_yann_mnist_H1_02"
+experiment_name = "experiment_08_yann_mnist_H1"
 def output_dir_generator(i):
     return "/data/lisatmp2/alaingui/dae/generated_samples/%s/%0.6d" % (experiment_name, i)
 
 ##################
 
-n_samples=5000
+n_samples=1000
 thinning_factor=10
-L_n_E_approx_path = [20]
+L_n_E_approx_path = [10]
 
 #L_mcmc_method = ["langevin_grad_E"]
 L_mcmc_method = ["MH_langevin_grad_E"]
@@ -43,7 +56,7 @@ L_langevin_beta = []
 L_omit_asymmetric_proposal_factor = [0,1]
 #L_proposal_noise_scheme = ['merge_x', 'noise_E', 'noise_r']
 L_proposal_noise_scheme = ['merge_x']
-L_temperature = [5, 1, 0.2]
+L_temperature = [10, 1]
 
 L_proposal_stddev = [0.1, 0.01]
 
