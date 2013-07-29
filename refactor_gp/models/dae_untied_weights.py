@@ -14,6 +14,10 @@ import numpy as np
 from theano import *
 import theano.tensor as T
 
+import refactor_gp
+import refactor_gp.models
+from   refactor_gp.models import dae
+
 from dae import DAE
 
 class DAE_untied_weights(DAE):
@@ -27,6 +31,7 @@ class DAE_untied_weights(DAE):
                  c=None,  b=None,
                  s=None, act_func=['tanh', 'tanh'],
                  want_constant_s = False,
+                 loss_function_desc = None,
                  dae_pickle_file=None):
         """
         Initialize a DAE.
@@ -54,6 +59,8 @@ class DAE_untied_weights(DAE):
             This used to be just a real number, but now
             we use a vector because we want to scale each output
             independantly.
+        loss_function_desc : either "quadratic" (default) or "cross-entropy"
+        dae_pickle_file : pickle file previously saved from this implementation
         """
 
         # Note that we should probably be using some scheme
@@ -90,6 +97,7 @@ class DAE_untied_weights(DAE):
             self.s = s
 
         self.want_constant_s = want_constant_s
+        self.loss_function_desc = loss_function_desc
 
         if len(act_func) != 2:
             raise("Need to specify two activation functions from : ['tanh', 'sigmoid', 'id'].")
@@ -113,6 +121,26 @@ class DAE_untied_weights(DAE):
     
     def theano_setup(self):
     
+        if self.loss_function_desc is None:
+            self.loss_function_desc = "quadratic"
+        else:
+            assert self.loss_function_desc in ["quadratic", "cross-entropy"]
+
+        if self.loss_function_desc == "cross-entropy":
+            # It would be possible to change this automatically,
+            # but I think we would not be doing the user a service
+            # by not pointing out this configuration problem.
+            # It's better to issue an error here and let the user
+            # fix the configuration higher up.
+            if self.want_constant_s == False:
+                print "You cannot use the cross-entropy loss and not ask for the scaling constant 's' to be optimized."
+                print "It has to be 1.0. Quitting here."
+                quit()
+            elif not (self.act_func[1] == 'sigmoid'):
+                print "You cannot use the cross-entropy loss and not use a sigmoid as second activation function."
+                print "Quitting here."
+                quit()
+
         # The matrices Wb and Wc were originally tied.
         # Because of that, I decided to keep Wb and Wc with
         # the same shape (instead of being transposed) to
@@ -160,7 +188,11 @@ class DAE_untied_weights(DAE):
         # we need to have some correction factor to the loss
         # to make it equivalent.
 
-        loss = ((r - y)**2) * importance_sampling_weights[:,np.newaxis]
+        if self.loss_function_desc == "quadratic":
+            loss = ((r - y)**2) * importance_sampling_weights[:,np.newaxis]
+        else:
+            loss = -((1-y)*T.log(1-r) + y*T.log(r)) * importance_sampling_weights[:,np.newaxis]
+
         sum_loss = T.sum(loss)
         
         # theano_encode_decode : vectorial function in argument X.
@@ -359,7 +391,8 @@ class DAE_untied_weights(DAE):
                       'act_func':self.act_func,
                       'n_inputs':self.n_inputs,
                       'n_hiddens':self.n_hiddens,
-                      'want_constant_s':self.want_constant_s},
+                      'want_constant_s':self.want_constant_s,
+                      'loss_function_desc':self.loss_function_desc},
                      open(pickle_file_path, "w"))
 
     def load_pickle(self, pickle_file_path):
@@ -380,6 +413,8 @@ class DAE_untied_weights(DAE):
         self.q_set_params(params['q'])
         if params.has_key('want_constant_s'):
             self.want_constant_s = params['want_constant_s']
+        if params.has_key('loss_function_desc'):
+            self.loss_function_desc = params['loss_function_desc']
         # we need to regenerate the theano functions
         self.theano_setup()
         self.theano_setup_flat()

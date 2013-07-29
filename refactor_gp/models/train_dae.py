@@ -23,7 +23,7 @@ def main(argv):
     import json
 
     try:
-        opts, args = getopt.getopt(argv[1:], "hv", ["n_hiddens=", "maxiter=", "lbfgs_rank=", "act_func=", "noise_stddevs=", "train_samples_pickle=", "valid_samples_pickle=", "test_samples_pickle=", "output_dir=", "save_hidden_units=", "resume_dae_pickle="])
+        opts, args = getopt.getopt(argv[1:], "hv", ["n_hiddens=", "maxiter=", "lbfgs_rank=", "act_func=", "noise_stddevs=", "train_samples_pickle=", "valid_samples_pickle=", "test_samples_pickle=", "output_dir=", "save_hidden_units=", "resume_dae_pickle=", "want_constant_s=", "loss_function_desc="])
     except getopt.GetoptError as err:
         # print help information and exit:
         print str(err) # will print something like "option -a not recognized"
@@ -43,6 +43,8 @@ def main(argv):
     # used for multilayers
     save_hidden_units = False
     resume_dae_pickle = None
+    want_constant_s = None
+    loss_function_desc = None
 
     verbose = False
     for o, a in opts:
@@ -80,6 +82,10 @@ def main(argv):
             save_hidden_units = ((a == "True") or (a == "true") or (a=="1"))
         elif o in ("--resume_dae_pickle"):
             resume_dae_pickle = a
+        elif o in ("--want_constant_s"):
+            want_constant_s = ((a == "True") or (a == "true") or (a=="1"))
+        elif o in ("--loss_function_desc"):
+            loss_function_desc = a
         else:
             assert False, "unhandled option"
 
@@ -109,7 +115,9 @@ def main(argv):
     else:
         mydae = DAE_untied_weights(n_inputs = n_inputs,
                                    n_hiddens = n_hiddens,
-                                   act_func = act_func)
+                                   act_func = act_func,
+                                   want_constant_s = want_constant_s,
+                                   loss_function_desc = loss_function_desc)
 
     #mydae.fit_with_decreasing_noise(mnist_train_data[0:2000,:],
     #                                [0.1, 0.05, 0.01, 0.001],

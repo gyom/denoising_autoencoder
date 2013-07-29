@@ -25,7 +25,7 @@ def main(argv):
     print argv
 
     try:
-        opts, args = getopt.getopt(argv[1:], "hv", ["pickled_samples_file=", "output_dir="])
+        opts, args = getopt.getopt(argv[1:], "hv", ["pickled_samples_file=", "output_dir=", "N="])
     except getopt.GetoptError as err:
         # print help information and exit:
         print str(err) # will print something like "option -a not recognized"
@@ -68,10 +68,17 @@ def main(argv):
     subsamples = samples[ind[0:N]]
     print "subsamples.shape is %s" % (str(subsamples.shape),)
 
-    for i in range(0,d-1):
-        output_image_file = os.path.join(output_dir,"overview_dimensions_%d_and_%d.png" % (i,i+1))
+    for i in range(0,d):
+
+        if i == d-1:
+            # cycle back to zero
+            next_i = 0
+        else:
+            next_i = i + 1
+
+        output_image_file = os.path.join(output_dir,"overview_dimensions_%d_and_%d.png" % (i, next_i))
         print "Will attempt to generate %s" % (output_image_file,)
-        plot_the_overview(subsamples, i, i+1, output_image_file)
+        plot_the_overview(subsamples, i, next_i, output_image_file)
         print "Wrote %s." % ( output_image_file, )
 
 

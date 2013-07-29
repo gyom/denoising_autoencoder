@@ -6,7 +6,8 @@ import json
 import numpy as np
 
 root_dir = "/data/lisatmp2/alaingui/dae/dae_trained_models/mnist_yann_H1"
-full_dir = os.path.join(root_dir, "experiment_09_yann_mnist_H1_walkback")
+experiment_name = "experiment_11_yann_mnist_H1_walkback"
+full_dir = os.path.join(root_dir, experiment_name)
 
 json_files = [e for e in subprocess.check_output("find %s -name extra_details.json" % (full_dir,), shell=True).split("\n") if len(e) > 0]
 
@@ -27,15 +28,25 @@ for r in results:
     assert train_sampled_used == [e["sampled"] for e in r["noise_stddevs"]["train"]]
 
 
+for r in results:
+    for (k,v) in r["model_losses"].items():
+        if np.all(v < 0):
+            print "Got illegal value in %s" % (k,)
+
 
 
 def f(L):
 
+    def fine_value(v):
+        return not (np.isinf(v) or np.isnan(v))
+
     def m(A):
-        return np.hstack([np.array(a).reshape((-1,1)) for a in A]).mean(axis=1)
+        return [np.mean(np.array([v for v in row if fine_value(v)]))
+                for row in np.hstack([np.array(a).reshape((-1,1)) for a in A])]
 
     def c(A):
-        return [np.cov(row) for row in np.hstack([np.array(a).reshape((-1,1)) for a in A])]
+        return [np.var(np.array([v for v in row if fine_value(v)]))
+                for row in np.hstack([np.array(a).reshape((-1,1)) for a in A])]
 
     #{"valid_at_0.1":{"mean": m([e["model_losses"]["valid_at_0.1"] for e in L]),
     #                  "cov": c([e["model_losses"]["valid_at_0.1"] for e in L])},
@@ -50,6 +61,7 @@ def f(L):
 
 
 L_n_hiddens = [128, 256, 512]
+#L_n_hiddens = [128]
 L_walkback_param_p = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 summarized_results = []
 for n_hiddens in L_n_hiddens:
@@ -63,6 +75,9 @@ for n_hiddens in L_n_hiddens:
         print "(n_hiddens, walkback_param_p) == (%d,%f) has %d entries" % (n_hiddens, walkback_param_p, len(L))
 
         assert len(L) > 0
+        #if len(L) == 0:
+        #    continue
+
         summarized_results.append( dict({"n_hiddens" : n_hiddens,
                                          "walkback_param_p" : walkback_param_p}.items() +
                                         f(L).items())  )
@@ -101,14 +116,12 @@ print [e["n_hiddens"] for e in summarized_results]
 print [e["walkback_param_p"] for e in summarized_results]
 
 
-output_dir = "/u/alaingui/umontreal/tmp"
+output_dir = os.path.join("/u/alaingui/umontreal/tmp/", experiment_name)
 for loss_name in ["train", "valid", "valid_at_1.0", "valid_at_0.1", "valid_at_0.01"]:
     for n_hiddens in L_n_hiddens:
         output_image_file = os.path.join(output_dir, "walkback_comparison_loss_%s_n_hiddens%d.png" % (loss_name, n_hiddens,))
 
         for (walkback_param_p,i) in zip(L_walkback_param_p, range(len(L_walkback_param_p))):
-
-
 
             #loss_name = "valid"
             e = [e for e in summarized_results if (e["n_hiddens"] == n_hiddens) and (e["walkback_param_p"] == walkback_param_p)][0]

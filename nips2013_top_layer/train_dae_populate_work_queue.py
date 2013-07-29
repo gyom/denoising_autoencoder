@@ -4,7 +4,7 @@ import redis
 import numpy as np
 
 #r_server = redis.Redis("localhost", 6379)
-r_server = redis.Redis("eos2", 6379)
+r_server = redis.Redis("eos1", 6379)
 
 if not r_server.ping():
     print "Cannot ping server. Exiting."
@@ -25,8 +25,8 @@ if debug:
     train_samples_pickle = "/data/lisatmp2/alaingui/mnist/yann/yann_train_H1_trim_100.pkl"
     valid_samples_pickle = "/data/lisatmp2/alaingui/mnist/yann/yann_valid_H1_trim_100.pkl"
 else:
-    train_samples_pickle = "/data/lisatmp2/alaingui/mnist/yann/yann_train_H1_trim_10000.pkl"
-    #train_samples_pickle = "/data/lisatmp2/alaingui/mnist/yann/yann_train_H1.pkl"
+    #train_samples_pickle = "/data/lisatmp2/alaingui/mnist/yann/yann_train_H1_trim_10000.pkl"
+    train_samples_pickle = "/data/lisatmp2/alaingui/mnist/yann/yann_train_H1.pkl"
     valid_samples_pickle = "/data/lisatmp2/alaingui/mnist/yann/yann_valid_H1.pkl"
 
 #experiment_name = "experiment_05_yann_mnist_H1_kicking"
@@ -39,14 +39,16 @@ if True:
     L_lbfgs_rank = [8]
     #L_act_func = [ '["tanh", "sigmoid"]', '["sigmoid", "sigmoid"]']
     L_act_func = [ '["sigmoid", "sigmoid"]']
-    n_reps = 20
+    n_reps = 4
+    loss_function_desc = "cross-entropy"
+    want_constant_s = "True"
 
-    mode = 4
+    mode = 1
 
     kicking_param_p = 0.5
-    walkback_param_p = 0.1
+    walkback_param_p = 0.5
     if mode == 1:
-        experiment_name = "experiment_08_yann_mnist_H1_normal"
+        experiment_name = "experiment_09_yann_mnist_H1_normal"
         S      = [np.exp(s*np.log(10.0)) for s in np.linspace(1,0,7)] + [np.exp(s*np.log(10.0)) for s in np.linspace(0,-2,13)]
         noise_stddevs = {}
         noise_stddevs['train'] = [{'target':s, 'sampled':s} for s in S]
@@ -54,17 +56,17 @@ if True:
         noise_stddevs['valid_kicking'] = [{'sampled':s, 'kicking':10*s, 'kicking_param_p':kicking_param_p} for s in S]
         noise_stddevs['valid_walkback'] = [{'sampled':s, 'walkback_param_p':walkback_param_p} for s in S]
         noise_stddevs['gentle_valid'] = [{'target':10*s, 'sampled':10*s} for s in S]
-    elif mode == 2:
-        experiment_name = "experiment_08_yann_mnist_H1_kicking"
-        S      = [np.exp(s*np.log(10.0)) for s in np.linspace(1,0,7)] + [np.exp(s*np.log(10.0)) for s in np.linspace(0,-2,13)]
-        noise_stddevs = {}
-        noise_stddevs['train'] = [{'sampled':s, 'kicking':10*s, 'kicking_param_p':kicking_param_p} for s in S]
-        noise_stddevs['valid'] = [{'target':s, 'sampled':s} for s in S]
-        noise_stddevs['valid_kicking'] = [{'sampled':s, 'kicking':10*s, 'kicking_param_p':kicking_param_p} for s in S]
-        noise_stddevs['valid_walkback'] = [{'sampled':s, 'walkback_param_p':walkback_param_p} for s in S]
-        noise_stddevs['gentle_valid'] = [{'target':10*s, 'sampled':10*s} for s in S]
+    #elif mode == 2:
+    #    experiment_name = "experiment_09_yann_mnist_H1_kicking"
+    #    S      = [np.exp(s*np.log(10.0)) for s in np.linspace(1,0,7)] + [np.exp(s*np.log(10.0)) for s in np.linspace(0,-2,13)]
+    #    noise_stddevs = {}
+    #    noise_stddevs['train'] = [{'sampled':s, 'kicking':10*s, 'kicking_param_p':kicking_param_p} for s in S]
+    #    noise_stddevs['valid'] = [{'target':s, 'sampled':s} for s in S]
+    #    noise_stddevs['valid_kicking'] = [{'sampled':s, 'kicking':10*s, 'kicking_param_p':kicking_param_p} for s in S]
+    #    noise_stddevs['valid_walkback'] = [{'sampled':s, 'walkback_param_p':walkback_param_p} for s in S]
+    #    noise_stddevs['gentle_valid'] = [{'target':10*s, 'sampled':10*s} for s in S]
     elif mode == 3:
-        experiment_name = "experiment_08_yann_mnist_H1_walkback"
+        experiment_name = "experiment_09_yann_mnist_H1_walkback"
         S      = [np.exp(s*np.log(10.0)) for s in np.linspace(1,0,7)] + [np.exp(s*np.log(10.0)) for s in np.linspace(0,-2,13)]
         noise_stddevs = {}
         noise_stddevs['train'] = [{'sampled':s, 'walkback_param_p':walkback_param_p} for s in S]
@@ -72,16 +74,6 @@ if True:
         noise_stddevs['valid_kicking'] = [{'sampled':s, 'kicking':10*s, 'kicking_param_p':kicking_param_p} for s in S]
         noise_stddevs['valid_walkback'] = [{'sampled':s, 'walkback_param_p':walkback_param_p} for s in S]
         noise_stddevs['gentle_valid'] = [{'target':10*s, 'sampled':10*s} for s in S]
-    elif mode == 4:
-        experiment_name = "experiment_08_yann_mnist_H1_walkback2"
-        S      = [np.exp(s*np.log(10.0)) for s in np.linspace(1,0,7)] + [np.exp(s*np.log(10.0)) for s in np.linspace(0,-2,13)]
-        noise_stddevs = {}
-        noise_stddevs['train'] = [{'sampled':s, 'walkback_param_p':2*walkback_param_p} for s in S]
-        noise_stddevs['valid'] = [{'target':s, 'sampled':s} for s in S]
-        noise_stddevs['valid_kicking'] = [{'sampled':s, 'kicking':10*s, 'kicking_param_p':kicking_param_p} for s in S]
-        noise_stddevs['valid_walkback'] = [{'sampled':s, 'walkback_param_p':walkback_param_p} for s in S]
-        noise_stddevs['gentle_valid'] = [{'target':10*s, 'sampled':10*s} for s in S]
-
 
 else:
     quit()
@@ -96,8 +88,8 @@ for maxiter in L_maxiter:
                     output_dir = "/data/lisatmp2/alaingui/dae/dae_trained_models/mnist_yann_H1/%s/%0.6d" % (experiment_name, output_dir_counter)
                     output_dir_counter += 1
 
-                    params = (training_script_path, n_hiddens, maxiter, lbfgs_rank, act_func, str(noise_stddevs).replace("'", '"'), train_samples_pickle, valid_samples_pickle, output_dir)
-                    command = """python %s --n_hiddens=%d --maxiter=%d --lbfgs_rank=%d --act_func='%s' --noise_stddevs='%s' --train_samples_pickle="%s" --valid_samples_pickle="%s" --output_dir="%s" """ % params
+                    params = (training_script_path, n_hiddens, maxiter, lbfgs_rank, act_func, want_constant_s, loss_function_desc, str(noise_stddevs).replace("'", '"'), train_samples_pickle, valid_samples_pickle, output_dir)
+                    command = """python %s --n_hiddens=%d --maxiter=%d --lbfgs_rank=%d --act_func='%s' --want_constant_s=%s --loss_function_desc=%s --noise_stddevs='%s' --train_samples_pickle="%s" --valid_samples_pickle="%s" --output_dir="%s" """ % params
 
                     print command
                     print
