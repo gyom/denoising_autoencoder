@@ -17,11 +17,15 @@ export DATA_ROOT_DIR=${SRC_ROOT_DIR}/data
 # Use this to have testing and progressbar.
 export DOCKER_CONTAINER_NAME=dae:v1
 
-
 docker run -it  -v ${SRC_ROOT_DIR}:/current_project  -v ${DATA_ROOT_DIR}:/current_project/data ${DOCKER_CONTAINER_NAME}  \
     python /current_project/src/denoising_autoencoder/reduce_discretized_density.py \
     --input_pickle_glob='/current_project/data/p_part_*.pkl' \
     --output_pickle_path=/current_project/data/p_reduced.pkl
+
+docker run -it  -v ${SRC_ROOT_DIR}:/current_project  -v ${DATA_ROOT_DIR}:/current_project/data ${DOCKER_CONTAINER_NAME}  \
+    python /current_project/src/denoising_autoencoder/reduce_discretized_density.py \
+    --input_pickle_glob='/current_project/data/q_part_*.pkl' \
+    --output_pickle_path=/current_project/data/q_reduced.pkl
 
 
 #ls /current_project/src

@@ -47,7 +47,7 @@ flags.DEFINE_float(
     "spiral_noise_sigma", 0.01,
     "Defines the intrinsic width of the spiral.")
 
-flags.DEFINE_float(
+flags.DEFINE_integer(
     "nbr_iter", 100,
     "Number of samples to draw and spread their weights.")
 
