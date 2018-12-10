@@ -2,10 +2,6 @@
 data/
 
 .DS_Store
-runners/.DS_Store
-notebooks/.DS_Store
-src/.DS_Store
-src/denoising_autoencoder/.DS_Store
 
 
 # Byte-compiled / optimized / DLL files

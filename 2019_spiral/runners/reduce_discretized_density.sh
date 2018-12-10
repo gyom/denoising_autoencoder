@@ -18,21 +18,10 @@ export DATA_ROOT_DIR=${SRC_ROOT_DIR}/data
 export DOCKER_CONTAINER_NAME=dae:v1
 
 
-# docker run -it  -v ${SRC_ROOT_DIR}:/current_project  -v ${DATA_ROOT_DIR}:/current_project/data ${DOCKER_CONTAINER_NAME}  \
-#    python /current_project/src/denoising_autoencoder/generate_discretized_density.py \
-#    --grid_nbr_points=1000 \
-#    --grid_radius=1.0 \
-#    --output_pickle_path=/current_project/data/p_part_00.pkl
-
-
-for i in `seq 0 9`
-do
-    docker run -it  -v ${SRC_ROOT_DIR}:/current_project  -v ${DATA_ROOT_DIR}:/current_project/data ${DOCKER_CONTAINER_NAME}  \
-        python /current_project/src/denoising_autoencoder/generate_discretized_density.py \
-        --grid_nbr_points=1000 \
-        --grid_radius=1.0 \
-        --output_pickle_path=/current_project/data/p_part_0${i}.pkl
-done
+docker run -it  -v ${SRC_ROOT_DIR}:/current_project  -v ${DATA_ROOT_DIR}:/current_project/data ${DOCKER_CONTAINER_NAME}  \
+    python /current_project/src/denoising_autoencoder/reduce_discretized_density.py \
+    --input_pickle_glob='/current_project/data/p_part_*.pkl' \
+    --output_pickle_path=/current_project/data/p_reduced.pkl
 
 
 #ls /current_project/src
