@@ -25,7 +25,7 @@ export DOCKER_CONTAINER_NAME=dae:v1
 #    --output_pickle_path=/current_project/data/p_part_00.pkl
 
 
-for i in `seq 0 39`
+for i in `seq 0 99`
 do
     # The actual spiral.
     docker run -it  -v ${SRC_ROOT_DIR}:/current_project  -v ${DATA_ROOT_DIR}:/current_project/data ${DOCKER_CONTAINER_NAME}  \

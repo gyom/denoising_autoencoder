@@ -16,6 +16,7 @@ import os
 import pickle
 
 import numpy as np
+import numpy.testing as npt
 import scipy
 import scipy.stats
 
@@ -36,15 +37,15 @@ flags.DEFINE_string(
     "Pickle file where we want to store the computed density.")
 
 flags.DEFINE_integer(
-    "grid_nbr_points", 1000,
+    "grid_nbr_points", None,
     "Generate a square grid of shape (2*grid_nbr_points+1, 2*grid_nbr_points+1 ).")
 
 flags.DEFINE_float(
-    "grid_radius", 4.0,
+    "grid_radius", 1.0,
     "Generate a square grid spanning [-grid_radius, grid_radius]^2.")
 
 flags.DEFINE_float(
-    "spiral_noise_sigma", 0.01,
+    "spiral_noise_sigma", None,
     "Defines the intrinsic width of the spiral.")
 
 flags.DEFINE_integer(
@@ -65,6 +66,8 @@ def normal_pdf_contributions_on_grid(x, y, grid_x, grid_y, sigma, want_log=False
     We also need to make sure that the contributions INTEGRATE to 1.0,
     which is trickier than just normalizing them because we need to
     take into account the grid itself.
+
+    NOTE : THIS FUNCTION IS BROKEN. YOU TOOK A MATH SHORTCUT THAT WAS NOT WORKING.
     """
 
     # check that this is the right orientation
@@ -86,7 +89,20 @@ def normal_pdf_contributions_on_grid(x, y, grid_x, grid_y, sigma, want_log=False
 
 
 def normal_logpdf_contributions_on_grid(x, y, grid_x, grid_y, sigma):
-    return normal_pdf_contributions_on_grid(x, y, grid_x, grid_y, sigma, want_log=True)
+
+    """
+    My own implementation to try to avoid weird values that I got from
+    calling `scipy.stats.norm.logpdf` and getting values in the -1e8.
+    """
+
+    delta_x = (x - grid_x) / sigma
+    delta_y = (y - grid_y) / sigma
+
+    a = - 0.5*delta_x*delta_x - 0.5*delta_y*delta_y
+    b = -np.log(2*np.pi*sigma)
+
+    return a + b
+    # return normal_pdf_contributions_on_grid(x, y, grid_x, grid_y, sigma, want_log=True)
 
 
 def run():
@@ -172,6 +188,22 @@ def run():
         print("Wrote %s." % output_pickle_path)
 
 
+
+def test_normal_logpdf_contributions_on_grid_01():
+
+    grid_x, grid_y = np.meshgrid(np.linspace(-1.0, 1.0, 100),
+                                 np.linspace(-1.0, 1.0, 100),
+                                 sparse=False, indexing='ij')
+
+    for x in np.linspace(-1.0, 1.0, 5):
+        for y in np.linspace(-1.0, 1.0, 5):
+            for sigma in [0.1, 0.01]:  # TODO add back 0.1
+                log_pdf_values = normal_logpdf_contributions_on_grid(x, y, grid_x, grid_y, sigma)
+
+                lower_bound = -1 + -4/(sigma**2)
+                upper_bound = 5
+                npt.assert_array_less(lower_bound*np.ones_like(log_pdf_values), log_pdf_values)
+                npt.assert_array_less(log_pdf_values, upper_bound*np.ones_like(log_pdf_values))
 
 
 

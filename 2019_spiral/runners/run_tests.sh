@@ -10,3 +10,6 @@ export DOCKER_CONTAINER_NAME=dae:v1
 
 docker run -it  -v ${SRC_ROOT_DIR}:/current_project  -v ${DATA_ROOT_DIR}:/current_project/data ${DOCKER_CONTAINER_NAME}  \
     nosetests /current_project/src/denoising_autoencoder/logsumexp.py
+
+docker run -it  -v ${SRC_ROOT_DIR}:/current_project  -v ${DATA_ROOT_DIR}:/current_project/data ${DOCKER_CONTAINER_NAME}  \
+    nosetests /current_project/src/denoising_autoencoder/generate_discretized_density.py
