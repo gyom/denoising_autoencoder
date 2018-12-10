@@ -25,7 +25,7 @@ export DOCKER_CONTAINER_NAME=dae:v1
 #    --output_pickle_path=/current_project/data/p_part_00.pkl
 
 
-for i in `seq 0 9`
+for i in `seq 0 39`
 do
     # The actual spiral.
     docker run -it  -v ${SRC_ROOT_DIR}:/current_project  -v ${DATA_ROOT_DIR}:/current_project/data ${DOCKER_CONTAINER_NAME}  \
@@ -33,8 +33,10 @@ do
         --grid_nbr_points=1000 \
         --grid_radius=1.0 \
         --spiral_noise_sigma=0.01 \
-        --nbr_iter=100 \
+        --nbr_iter=25 \
         --output_pickle_path=/current_project/data/p_part_0${i}.pkl
+
+    # echo "Done with p part ${i}."
 
     # A sampling proposal q with a lot more noise.
     docker run -it  -v ${SRC_ROOT_DIR}:/current_project  -v ${DATA_ROOT_DIR}:/current_project/data ${DOCKER_CONTAINER_NAME}  \
@@ -42,8 +44,11 @@ do
         --grid_nbr_points=1000 \
         --grid_radius=1.0 \
         --spiral_noise_sigma=0.1 \
-        --nbr_iter=100 \
+        --nbr_iter=25 \
         --output_pickle_path=/current_project/data/q_part_0${i}.pkl
+
+    # echo "Done with q part ${i}."
+
 done
 
 

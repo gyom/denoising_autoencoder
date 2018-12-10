@@ -11,7 +11,15 @@ def logsumexp(A, axis):
     If A is of shape (K, K, N), this returns an array of shape (K, K).
     """
     M = np.max(A, axis=axis, keepdims=True)
-    return np.log(np.exp(A-M).sum(axis=axis)) + M.squeeze()
+    B = A - M
+
+    #lower_bound = -500
+    #B[B < lower_bound] = lower_bound
+    #assert B.max() <= 1.0
+    #assert lower_bound <= B.min()
+
+    r = np.log(np.exp(B).sum(axis=axis)) + M.squeeze()
+    return r
 
 
 def test_logsumexp_01():

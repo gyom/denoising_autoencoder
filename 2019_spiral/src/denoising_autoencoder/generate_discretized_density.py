@@ -107,8 +107,8 @@ def run():
     nbr_iter = FLAGS.nbr_iter
     assert 1 <= nbr_iter
 
-    grid_x, grid_y = np.meshgrid(np.linspace(-grid_radius, -grid_radius, grid_nbr_points),
-                                 np.linspace(-grid_radius, -grid_radius, grid_nbr_points),
+    grid_x, grid_y = np.meshgrid(np.linspace(-grid_radius, grid_radius, grid_nbr_points),
+                                 np.linspace(-grid_radius, grid_radius, grid_nbr_points),
                                  sparse=False, indexing='ij')
 
     #for i in range(FLAGS.grid_nbr_points):
@@ -166,7 +166,7 @@ def run():
                 "spiral_noise_sigma" : spiral_noise_sigma,
                 "nbr_iter" : nbr_iter,
                 }
-
+    print("Will create %s." % output_pickle_path)
     with tf.gfile.GFile(output_pickle_path, mode='wb') as f:
         pickle.dump(results, f, protocol=pickle.HIGHEST_PROTOCOL)
         print("Wrote %s." % output_pickle_path)
