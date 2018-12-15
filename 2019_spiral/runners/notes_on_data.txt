@@ -1,0 +1,12 @@
+
+linear_02 :
+    denoising_autoencoder.spiral.sample(N=1,
+        noise_sigma=0.0,
+        want_even_mass_spread=True,
+        t_start = np.pi,
+        t_end = 4.75*np.pi)
+
+    --grid_nbr_points=1000
+    --grid_radius=1.0
+    --spiral_noise_sigma=0.05
+    --nbr_iter=25
